@@ -94,17 +94,16 @@ class ClaimRepository:
             )
         )
 
-    def find_previous_outcomes(self, category, exclude_claim):
+    def find_previous_outcomes(self, category, exclude_claim, reviewed_only=True):
+        statement = select(m.OutcomeRecord).where(
+            m.OutcomeRecord.category == category,
+            m.OutcomeRecord.claim_id != exclude_claim,
+        )
+        if reviewed_only:
+            statement = statement.where(m.OutcomeRecord.reviewed.is_(True))
         return list(
             self.session.scalars(
-                select(m.OutcomeRecord)
-                .where(
-                    m.OutcomeRecord.reviewed.is_(True),
-                    m.OutcomeRecord.category == category,
-                    m.OutcomeRecord.claim_id != exclude_claim,
-                )
-                .order_by(m.OutcomeRecord.created_at.desc())
-                .limit(5)
+                statement.order_by(m.OutcomeRecord.created_at.desc()).limit(5)
             )
         )
 

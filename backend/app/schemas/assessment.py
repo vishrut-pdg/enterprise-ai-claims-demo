@@ -18,6 +18,20 @@ class Assessment(BaseModel):
     explanation: str = Field(min_length=1, max_length=8000)
 
 
+class AutonomousAssessment(Assessment):
+    recommendation: Literal["accept", "reject"]
+
+
+class Investigation(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    recommendation: Literal["accept", "reject"]
+    confidence: float = Field(ge=0, le=1, allow_inf_nan=False)
+    findings: list[str] = Field(min_length=1)
+    evidence_ids: list[str]
+    summary: str = Field(min_length=1, max_length=8000)
+    limitations: list[str]
+
+
 class ProcessRequest(BaseModel):
     expected_version: int = Field(ge=1)
 

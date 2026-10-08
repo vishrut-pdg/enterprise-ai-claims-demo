@@ -59,7 +59,10 @@ async def run_evaluation():
                     case["claim_id"],
                     1,
                     Settings(
-                        llm_provider="mock", llm_model="evaluation", _env_file=None
+                        decision_mode="human_review",
+                        llm_provider="mock",
+                        llm_model="evaluation",
+                        _env_file=None,
                     ),
                     provider=CaseProvider(case.get("mode")),
                 )

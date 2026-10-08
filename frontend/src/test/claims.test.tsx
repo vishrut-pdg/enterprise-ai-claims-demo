@@ -17,28 +17,30 @@ describe('claims UI',()=>{
  it('shows loading',()=>{vi.mocked(api.claims).mockReturnValue(new Promise(()=>{}));wrap(<ClaimQueue/>);expect(screen.getByRole('status')).toHaveTextContent('Loading')})
  it('shows API errors',async()=>{vi.mocked(api.claims).mockRejectedValue(new Error('Backend unavailable'));wrap(<ClaimQueue/>);expect(await screen.findByRole('alert')).toHaveTextContent('Backend unavailable')})
  it('links claims and displays status',async()=>{vi.mocked(api.claims).mockResolvedValue([claim]);wrap(<ClaimQueue/>);expect(await screen.findByRole('link',{name:/CLM-003/})).toHaveAttribute('href','#/claims/CLM-003')})
- it('separates facts, policy, findings and interpretation',()=>{render(<ClaimFacts claim={claim}/>);for(const name of ['Source facts','Applicable policy','Evidence','Deterministic policy findings','AI assessment'])expect(screen.getByRole('heading',{name})).toBeInTheDocument();expect(screen.getByText('Please provide receipt')).toBeInTheDocument()})
+ it('separates facts, policy, findings and interpretation',()=>{render(<ClaimFacts claim={claim}/>);for(const name of ['Source facts','Applicable policy','Evidence','Deterministic policy findings','Final AI decision'])expect(screen.getByRole('heading',{name})).toBeInTheDocument();expect(screen.getByText('Please provide receipt')).toBeInTheDocument()})
  it('requires rationale for manager decisions',async()=>{vi.mocked(api.review).mockResolvedValue({id:'r',claim_id:claim.id,claim,status:'open',active:true,assigned_role:'manager',reason:'Missing evidence',evidence_ids:[],unresolved_questions:[],decisions:[]});wrap(<ReviewDetail id="r"/>);expect(await screen.findByRole('button',{name:'Accept'})).toBeDisabled();expect(screen.getByRole('button',{name:'Reject'})).toBeDisabled()})
 })
 
 describe('action feedback and assistant',()=>{
  it('explains that investigation is open rather than a final decision',()=>{render(<ActionFeedback claim={claim}/>);expect(screen.getByRole('status')).toHaveTextContent('Investigation opened');expect(screen.getByRole('status')).toHaveTextContent('awaiting review')})
  it('sends a grounded question and shows cited answer',async()=>{vi.mocked(api.chat).mockResolvedValue({answer:'A receipt is missing.',sources:['CLM-003'],provider:'mock',read_only:true});wrap(<ClaimsAssistant claimId="CLM-003"/>);await userEvent.click(screen.getByRole('button',{name:'Ask assistant'}));await userEvent.type(screen.getByRole('textbox',{name:'Ask the claims assistant'}),'What evidence is missing?');await userEvent.click(screen.getByRole('button',{name:'Send message'}));expect(await screen.findByText('A receipt is missing.')).toBeInTheDocument();expect(api.chat).toHaveBeenCalledWith('What evidence is missing?','CLM-003',[]);expect(screen.getByRole('link',{name:'CLM-003'})).toHaveAttribute('href','#/claims/CLM-003')})
- it('reports failed batch jobs rather than falsely reporting acceptance',async()=>{vi.mocked(api.claims).mockResolvedValue([{...claim,status:'submitted'}]);vi.mocked(api.batch).mockResolvedValue({batch_id:'batch',jobs:[{claim_id:'CLM-003',job_id:'assess:batch:CLM-003'}]});vi.mocked(api.batchStatus).mockResolvedValue({worker_available:true,jobs:[{job_id:'assess:batch:CLM-003',status:'failed',result:null,error:'Assessment failed safely.'}]});wrap(<ClaimQueue/>);await userEvent.click(await screen.findByRole('button',{name:'Run'}));expect(await screen.findByRole('heading',{name:'Batch processing complete'})).toBeInTheDocument();expect(screen.getByText('Assessment failed safely.')).toBeInTheDocument();expect(screen.getByText('failed',{exact:true})).toBeInTheDocument()})
+ it('reports failed autonomous jobs without inventing a decision',async()=>{vi.mocked(api.claims).mockResolvedValue([{...claim,status:'submitted'}]);vi.mocked(api.activeJobs).mockResolvedValue({worker_available:true,jobs:[{claim_id:'CLM-003',job_id:'assess:auto:CLM-003:v1'}]});vi.mocked(api.batchStatus).mockResolvedValue({worker_available:true,jobs:[{job_id:'assess:auto:CLM-003:v1',status:'failed',result:null,error:'Assessment failed safely.'}]});wrap(<ClaimQueue/>);expect(await screen.findByText('Assessment failed safely.')).toBeVisible();expect(screen.getByText('failed',{exact:true})).toBeInTheDocument();expect(screen.queryByText('All claims decided')).not.toBeInTheDocument();expect(api.batch).not.toHaveBeenCalled()})
 })
 
 
 describe('batch demo controls',()=>{
- it('transitions Run to Running to Finished',async()=>{
+ it('automatically tracks AI work and final decisions without a Run button',async()=>{
   vi.mocked(api.claims).mockResolvedValue([{...claim,status:'submitted'}])
+  vi.mocked(api.activeJobs).mockResolvedValue({worker_available:true,jobs:[{claim_id:'CLM-003',job_id:'assess:auto:CLM-003:v1'}]})
   let finish!: (value: Awaited<ReturnType<typeof api.batchStatus>>)=>void
-  vi.mocked(api.batch).mockResolvedValue({batch_id:'state',jobs:[{claim_id:'CLM-003',job_id:'assess:state:CLM-003'}]})
   vi.mocked(api.batchStatus).mockReturnValue(new Promise(resolve=>{finish=resolve}))
   wrap(<ClaimQueue/>)
-  await userEvent.click(await screen.findByRole('button',{name:'Run'}))
-  expect(await screen.findByRole('button',{name:'Running'})).toBeDisabled()
-  finish({worker_available:true,jobs:[{job_id:'assess:state:CLM-003',status:'succeeded',result:{claim_id:'CLM-003',status:'pending_manager_review'},error:null}]})
-  expect(await screen.findByRole('button',{name:'Finished'})).toBeDisabled()
+  expect(await screen.findByText('AI processing')).toBeVisible()
+  expect(screen.queryByRole('button',{name:'Run'})).not.toBeInTheDocument()
+  vi.mocked(api.claims).mockResolvedValue([{...claim,status:'rejected'}])
+  finish({worker_available:true,jobs:[{job_id:'assess:auto:CLM-003:v1',status:'succeeded',result:{claim_id:'CLM-003',status:'rejected'},error:null}]})
+  expect(await screen.findByText('All claims decided')).toBeVisible()
+  expect(api.batch).not.toHaveBeenCalled()
  })
  it('puts a visible assistant in claim detail and removes individual processing',async()=>{
   vi.mocked(api.claim).mockResolvedValue(claim)
@@ -56,7 +58,7 @@ it('recovers active jobs without needing browser storage',async()=>{
  vi.mocked(api.activeJobs).mockResolvedValue({worker_available:true,jobs:[{job_id:'assess:CLM-003',claim_id:'CLM-003'}]})
  vi.mocked(api.batchStatus).mockResolvedValue({worker_available:true,jobs:[{job_id:'assess:CLM-003',status:'in_progress',result:null,error:null}]})
  wrap(<ClaimQueue/>)
- expect(await screen.findByRole('button',{name:'Running'})).toBeDisabled()
- expect(await screen.findByText('1 running · 0 queued')).toBeVisible()
+ expect(await screen.findByText('AI processing')).toBeVisible()
+ expect(await screen.findByText('1 investigating · 0 queued')).toBeVisible()
  expect(api.batch).not.toHaveBeenCalled()
 })

@@ -133,3 +133,38 @@ async def test_postgres_policy_vectors(postgres_engine, settings):
             "verified receipt evidence", ["expense-policy"]
         )
         assert passages[0]["heading"] == "Receipts"
+
+
+async def test_autonomous_concurrent_investigation_commits_one_decision(
+    postgres_engine, settings
+):
+    settings.decision_mode = "autonomous"
+
+    class InvestigatorRendezvous(MockProvider):
+        def __init__(self):
+            self.count = 0
+            self.ready = asyncio.Event()
+
+        async def generate(self, request):
+            if request.context.get("task") == "investigation":
+                self.count += 1
+                if self.count == 2:
+                    self.ready.set()
+                await asyncio.wait_for(self.ready.wait(), 5)
+            return await super().generate(request)
+
+    provider = InvestigatorRendezvous()
+
+    async def process():
+        with Session(postgres_engine, expire_on_commit=False) as session:
+            svc = ClaimService(ClaimRepository(session))
+            return await process_claim(svc, "CLM-003", 1, settings, provider=provider)
+
+    results = await asyncio.gather(process(), process(), return_exceptions=True)
+    assert sum(isinstance(result, DomainError) for result in results) == 1
+    succeeded = [r for r in results if isinstance(r, dict)]
+    assert succeeded[0]["status"] == "rejected"
+    with Session(postgres_engine) as session:
+        svc = ClaimService(ClaimRepository(session))
+        assert svc.list_reviews() == []
+        assert svc.detail("CLM-003")["version"] == 2

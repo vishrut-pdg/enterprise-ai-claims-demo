@@ -59,12 +59,14 @@ async def run_suite(provider_name="mock"):
         get_settings().model_copy(
             update={
                 "llm_provider": "vertex",
+                "decision_mode": "human_review",
                 "rag_enabled": True,
                 "embedding_provider": "vertex",
             }
         )
         if provider_name == "vertex"
         else Settings(
+            decision_mode="human_review",
             llm_provider="mock",
             llm_model="eval-mock",
             embedding_provider="mock",
@@ -256,7 +258,12 @@ async def run_suite(provider_name="mock"):
                             svc,
                             "CLM-001",
                             1,
-                            Settings(llm_provider="mock", rag_enabled=False, _env_file=None),
+                            Settings(
+                                decision_mode="human_review",
+                                llm_provider="mock",
+                                rag_enabled=False,
+                                _env_file=None,
+                            ),
                             provider=FaultProvider(fault),
                         )
                     except DomainError:

@@ -21,8 +21,8 @@ def seed(session):
         repo.add(
             m.Policy(
                 id="expense-policy",
-                name="Employee expenses v1",
-                text="USD expenses up to $500. Meals, travel and supplies only. A verified receipt is required for every line. Submit within 90 days. Duplicates require review.",
+                name="Employee expenses v2 — autonomous",
+                text="USD expenses up to $500. Meals, travel and supplies only. A verified receipt is required for every line. Submit within 90 days. AI investigates supplied evidence. Missing receipts, duplicates or unverified requirements result in rejection; no manager review.",
                 currency="USD",
                 auto_accept=True,
                 auto_reject=True,

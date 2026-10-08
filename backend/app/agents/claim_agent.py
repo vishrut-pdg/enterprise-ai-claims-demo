@@ -53,6 +53,18 @@ class ClaimAgent(BaseAgent):
                 self._tools.trajectory.append("retrieve_policy_passages")
             self._tools.record_context(claim_id, version, context)
             started = perf_counter()
+            if self._tools.autonomous:
+                investigation, investigation_response = await self._gateway.investigate(
+                    context, self._tools.run_id
+                )
+                context["investigation"] = investigation.model_dump()
+                context["investigation_usage"] = investigation_response.usage
+                self._tools.trajectory.append("investigate_claim")
+                self._tools.record_investigation(claim_id, version, context)
+                yield Event(
+                    author=self.name,
+                    custom_metadata={"tool": "investigate_claim", "claim_id": claim_id},
+                )
             assessment, response = await self._gateway.assess(
                 context, self._tools.run_id
             )

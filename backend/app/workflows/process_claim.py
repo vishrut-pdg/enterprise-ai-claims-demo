@@ -25,8 +25,9 @@ async def process_claim(
 async def _process_claim(
     service, claim_id, expected_version, settings, run_id, provider
 ):
-    service.prepare(claim_id, expected_version, run_id)
-    tools = ClaimTools(service, run_id)
+    autonomous = settings.decision_mode == "autonomous"
+    service.prepare(claim_id, expected_version, run_id, autonomous=autonomous)
+    tools = ClaimTools(service, run_id, autonomous=autonomous)
     gateway = LLMGateway(provider or create_provider(settings), settings)
     agent = ClaimAgent(tools, gateway)
     sessions = InMemorySessionService()

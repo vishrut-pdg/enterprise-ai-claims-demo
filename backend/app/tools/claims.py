@@ -15,8 +15,9 @@ class ToolResult(BaseModel):
 class ClaimTools:
     """Agent-facing surface: application service only, no persistence/session access."""
 
-    def __init__(self, service, run_id):
+    def __init__(self, service, run_id, autonomous=False):
         self._service, self.run_id, self.trajectory = service, run_id, []
+        self.autonomous = autonomous
 
     def call(self, name: str, request: ClaimInput) -> ToolResult:
         if name not in (
@@ -28,7 +29,13 @@ class ClaimTools:
         ):
             raise ValueError("Unknown retrieval tool")
         with span("tool." + name, self.run_id):
-            data = getattr(self._service, name)(request.claim_id)
+            data = (
+                self._service.get_previous_outcomes(
+                    request.claim_id, autonomous=self.autonomous
+                )
+                if name == "get_previous_outcomes"
+                else getattr(self._service, name)(request.claim_id)
+            )
             self.trajectory.append(name)
             return ToolResult(name=name, data=data)
 
@@ -37,6 +44,9 @@ class ClaimTools:
 
     def record_context(self, claim_id, version, context):
         self._service.record_context(claim_id, version, context, self.run_id)
+
+    def record_investigation(self, claim_id, version, context):
+        self._service.record_investigation(claim_id, version, context, self.run_id)
 
     def execute(self, claim_id, version, assessment, response, duration, context):
         # The service selects/revalidates the action; model text cannot choose arbitrary calls.
@@ -50,4 +60,5 @@ class ClaimTools:
                 duration,
                 self.trajectory,
                 context,
+                autonomous=self.autonomous,
             )

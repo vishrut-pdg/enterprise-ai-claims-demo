@@ -57,7 +57,9 @@ async def process(claim_id: str, request: ProcessRequest, svc: Service):
 
 @router.get("/claims/{claim_id}/memory", dependencies=[Depends(analyst)])
 def memory(claim_id: str, svc: Service):
-    return svc.get_previous_outcomes(claim_id)
+    return svc.get_previous_outcomes(
+        claim_id, autonomous=get_settings().decision_mode == "autonomous"
+    )
 
 
 @router.get("/reviews", dependencies=[Depends(analyst)])
@@ -77,6 +79,11 @@ def decision(
     svc: Service,
     actor: Annotated[str, Depends(manager)],
 ):
+    if get_settings().decision_mode == "autonomous":
+        raise DomainError(
+            "Week 4 decisions are made by the AI investigator; human decision controls are disabled",
+            409,
+        )
     return svc.manager_decision(review_id, request, actor, correlation_id.get())
 
 
@@ -94,7 +101,11 @@ async def batch(request: list[str], svc: Service):
 
 @router.get("/health")
 def health():
-    return {"status": "ok", "provider": get_settings().llm_provider}
+    return {
+        "status": "ok",
+        "provider": get_settings().llm_provider,
+        "decision_mode": get_settings().decision_mode,
+    }
 
 
 @router.get("/jobs/status", dependencies=[Depends(analyst)])

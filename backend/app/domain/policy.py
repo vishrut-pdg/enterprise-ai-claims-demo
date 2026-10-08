@@ -53,7 +53,7 @@ def calculate_checks(
         add(
             "currency",
             "investigate",
-            "Currency differs from policy; manual conversion review required.",
+            "Currency differs from policy; compliant conversion is not established by the supplied records.",
         )
     if amount > Decimal(str(rules["amount_limit"]["maximum"])):
         add("amount_limit", "reject", "Claim exceeds the policy amount limit.")

@@ -13,7 +13,7 @@ class MockProvider:
             if "claim" in context:
                 claim = context["claim"]
                 notes = "; ".join(check["message"] for check in context["checks"])
-                answer = f"{claim['id']} is {claim['status'].replace('_', ' ')}. {notes} Use the claim and manager review controls to record a decision; this assistant cannot change claims."
+                answer = f"{claim['id']} is {claim['status'].replace('_', ' ')}. {notes} The autonomous worker investigates and records the final decision; this assistant cannot change claims."
                 sources = [claim["id"], claim["policy"]["id"]]
             else:
                 claims = context["claims"]
@@ -38,6 +38,24 @@ class MockProvider:
             if any(f["severity"] == "investigate" for f in findings)
             else "accept"
         )
+        if (
+            request.context.get("execution_mode") == "autonomous"
+            and recommendation == "investigate"
+        ):
+            recommendation = "reject"
+        if request.context.get("task") == "investigation":
+            data = dict(
+                recommendation=recommendation,
+                confidence=0.99,
+                findings=[f["code"] for f in findings],
+                evidence_ids=[e["id"] for e in request.context["evidence"]],
+                summary="Investigated claim lines, supplied receipts, policy checks and duplicate evidence. "
+                + "; ".join(f["message"] for f in findings),
+                limitations=[f["message"] for f in findings if f["severity"] != "pass"],
+            )
+            return LLMResponse(
+                content=json.dumps(data), provider="mock", model=request.model
+            )
         data = dict(
             recommendation=recommendation,
             confidence=0.99,

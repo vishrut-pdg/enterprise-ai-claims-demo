@@ -1,4 +1,5 @@
-export type AssessmentData = { recommendation: 'accept' | 'reject' | 'investigate'; confidence: number; findings: string[]; evidence_ids: string[]; unresolved_questions: string[]; explanation: string }
+export type Investigation = {recommendation:'accept'|'reject';confidence:number;findings:string[];evidence_ids:string[];summary:string;limitations:string[]}
+export type AssessmentData = { investigation?: Investigation; decision_mode?:string; recommendation: 'accept' | 'reject' | 'investigate'; confidence: number; findings: string[]; evidence_ids: string[]; unresolved_questions: string[]; explanation: string }
 export type Assessment = { id: string; claim_version: number; data: AssessmentData }
 export type Finding = { id: string; claim_version: number; code: string; severity: string; message: string; evidence_ids: string[] }
 export type Evidence = { id: string; filename: string; kind: string; content: string; verified: boolean }

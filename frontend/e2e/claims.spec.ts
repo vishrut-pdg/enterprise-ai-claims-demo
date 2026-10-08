@@ -1,43 +1,43 @@
 import { test, expect } from '@playwright/test'
 
-test('batch demo: Run, Running, Finished, inline claim chat and manager outcome', async ({ page }) => {
+test('AI automatically investigates and decides all seven claims without human actions', async ({ page }) => {
   test.setTimeout(180000)
+  let manualSubmissions = 0
+  let humanDecisions = 0
+  page.on('request', request => {
+    if (request.method() === 'POST' && request.url().includes('/jobs/assess')) manualSubmissions++
+    if (request.method() === 'POST' && request.url().includes('/decisions')) humanDecisions++
+  })
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Claim queue', exact: true })).toBeVisible()
-  // Hold submission briefly to verify the busy control even with a fast mock model.
-  await page.route('**/api/jobs/assess', async route => {
-    await new Promise(resolve => setTimeout(resolve, 500))
-    await route.continue()
-  })
-  await page.getByRole('button', { name: 'Run', exact: true }).click()
-  await expect(page.getByRole('button', { name: 'Running', exact: true })).toBeDisabled()
-  await expect(page.getByRole('button', { name: 'Finished', exact: true })).toBeVisible({ timeout: 120000 })
-  await expect(page.getByText('7 of 7 assessments finished.')).toBeVisible()
-  await page.screenshot({ path: 'test-results/batch-finished.png', fullPage: true })
+  await expect(page.getByRole('button', { name: 'Run', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: 'Manager review', exact: true })).toHaveCount(0)
+  // Startup + recurring scan enqueue work without any button click.
+  await expect(page.getByText('All claims decided')).toBeVisible({ timeout: 120000 })
+  expect(manualSubmissions).toBe(0)
+  expect(humanDecisions).toBe(0)
+  await page.screenshot({ path: 'test-results/autonomous-queue.png', fullPage: true })
+  for (const id of ['CLM-001', 'CLM-004', 'CLM-005']) {
+    const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: new RegExp(id) }) })
+    await expect(row).toContainText('accepted')
+  }
+  for (const id of ['CLM-002', 'CLM-003', 'CLM-006', 'CLM-007']) {
+    const row = page.getByRole('row').filter({ has: page.getByRole('link', { name: new RegExp(id) }) })
+    await expect(row).toContainText('rejected')
+  }
   await page.reload()
-  await expect(page.getByRole('button', { name: 'Finished', exact: true })).toBeVisible()
-  await expect(page.getByText('0 running · 0 queued')).toBeVisible()
-  await page.getByRole('link', { name: /CLM-001 Client lunch/ }).click()
-  await expect(page.getByText('accepted', { exact: true }).first()).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Assess & process' })).toHaveCount(0)
-  await expect(page.getByRole('heading', { name: 'Ask about this claim' })).toBeVisible()
-  await page.getByRole('link', { name: '← Claim queue' }).click()
-  await page.getByRole('link', { name: /CLM-002 Personal entertainment/ }).click()
-  await expect(page.getByText('rejected', { exact: true }).first()).toBeVisible()
-  await page.getByRole('link', { name: '← Claim queue' }).click()
+  await expect(page.getByText('All claims decided')).toBeVisible()
   await page.getByRole('link', { name: /CLM-003 Airport taxi/ }).click()
-  await expect(page.locator('.page-heading').getByText('pending manager review', { exact: true })).toBeVisible()
+  await expect(page.locator('.page-heading').getByText('rejected', { exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'AI investigation', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Final AI decision', exact: true })).toBeVisible()
+  await expect(page.getByText('ai investigation completed', { exact: true })).toBeVisible()
+  await expect(page.getByText('autonomous decision recorded', { exact: true })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Open manager review' })).toHaveCount(0)
   await page.getByRole('button', { name: 'What evidence is missing?' }).click()
   await expect(page.getByRole('log')).toContainText(/receipt/i, { timeout: 60000 })
-  await page.screenshot({ path: 'test-results/claim-chat.png', fullPage: true })
-  await page.getByRole('link', { name: 'Open manager review' }).click()
-  await expect(page.getByRole('heading', { name: 'Investigation reason' })).toBeVisible()
-  await page.getByLabel('Reviewer rationale').fill('Original taxi receipt checked with employee; expense verified.')
-  await page.getByRole('button', { name: 'Accept', exact: true }).click()
-  await expect(page.getByText(/Investigation complete. Claim accepted/)).toBeVisible()
-  await expect(page.getByText('This review is closed.')).toBeVisible()
-  await page.getByRole('link', { name: 'View claim', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Recorded outcome' })).toBeVisible()
-  await expect(page.getByText('Reviewed outcome available to enterprise memory.')).toBeVisible()
-  await expect(page.getByText('manager decision recorded', { exact: true })).toBeVisible()
+  await page.screenshot({ path: 'test-results/ai-investigation.png', fullPage: true })
+  await page.getByRole('link', { name: 'Decision history', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Decision history', exact: true })).toBeVisible()
+  await expect(page.getByText('7 records')).toBeVisible()
 })

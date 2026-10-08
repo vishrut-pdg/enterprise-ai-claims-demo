@@ -91,7 +91,7 @@ async def test_chat_receives_policy_passages(service, settings):
         async def generate(self, request):
             assert request.context["policy_passages"][0]["heading"] == "Receipts"
             assert (
-                "policy:expense:v1:1"
+                "policy:expense:v2:1"
                 in request.response_schema["properties"]["sources"]["items"]["enum"]
             )
             return await super().generate(request)

@@ -32,7 +32,7 @@ async def index_policy(session, settings, text):
     for position, (heading, content) in enumerate(chunks(text)):
         prepared.append(
             PolicyChunk(
-                id=f"policy:expense:v1:{position + 1}",
+                id=f"policy:expense:v2:{position + 1}",
                 policy_id=POLICY_ID,
                 heading=heading,
                 content=content,

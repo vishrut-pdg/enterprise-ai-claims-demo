@@ -24,4 +24,16 @@ def service():
 
 @pytest.fixture
 def settings():
-    return Settings(llm_provider="mock", llm_model="reference-mock", _env_file=None)
+    return Settings(
+        llm_provider="mock",
+        llm_model="reference-mock",
+        decision_mode="human_review",
+        _env_file=None,
+    )
+
+
+@pytest.fixture(autouse=True)
+def legacy_api_configuration(monkeypatch, settings):
+    from app.api import routes
+
+    monkeypatch.setattr(routes, "get_settings", lambda: settings)

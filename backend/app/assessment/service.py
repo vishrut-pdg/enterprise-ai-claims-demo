@@ -79,10 +79,15 @@ class ClaimService:
             )
         ]
 
-    def get_previous_outcomes(self, claim_id):
+    def get_previous_outcomes(self, claim_id, autonomous=False):
         claim = self.get_claim(claim_id)
         category = claim["lines"][0]["category"] if claim["lines"] else ""
-        return [encode(o) for o in self.repo.find_previous_outcomes(category, claim_id)]
+        return [
+            encode(o)
+            for o in self.repo.find_previous_outcomes(
+                category, claim_id, reviewed_only=not autonomous
+            )
+        ]
 
     def audit(self, claim_id, event, actor, run_id, data=None):
         self.repo.add(
@@ -142,11 +147,16 @@ class ClaimService:
             query, [context["policy"]["id"]]
         )
 
-    def prepare(self, claim_id, expected, run_id):
+    def prepare(self, claim_id, expected, run_id, autonomous=False):
         claim = self.claim(claim_id)
         self.version(claim, expected)
-        if claim.status != "submitted":
-            raise DomainError("Only submitted claims can be processed")
+        allowed = (
+            {"submitted", "pending_manager_review", "information_requested"}
+            if autonomous
+            else {"submitted"}
+        )
+        if claim.status not in allowed:
+            raise DomainError("Only undecided claims can be processed")
         # End read transaction before awaiting a model, so current state can be reloaded.
         self.repo.commit()
 
@@ -196,6 +206,74 @@ class ClaimService:
             )
         self.repo.commit()
 
+    def record_investigation(self, claim_id, expected, context, run_id):
+        claim = self.claim(claim_id, lock=True)
+        self.version(claim, expected)
+        self.assert_context_current(claim_id, context)
+        self.audit(
+            claim_id,
+            "ai_investigation_completed",
+            "ai_investigator",
+            run_id,
+            context["investigation"],
+        )
+        self.repo.commit()
+
+    def autonomous_assessment(self, assessment, context, checks, policy, evidence):
+        from app.schemas.assessment import Investigation
+
+        investigation = Investigation.model_validate(context["investigation"])
+        if set(investigation.findings) != {f["code"] for f in checks} or not set(
+            investigation.evidence_ids
+        ) <= {e["id"] for e in evidence}:
+            raise DomainError("Investigation references changed; retry required")
+        reasons = [f["message"] for f in checks if f["severity"] != "pass"]
+        reasons += investigation.limitations + assessment.unresolved_questions
+        if (
+            investigation.recommendation != "accept"
+            and assessment.recommendation == "accept"
+        ):
+            reasons.append(
+                "The completed AI investigation did not substantiate acceptance. "
+                + investigation.summary
+            )
+        if min(investigation.confidence, assessment.confidence) < 0.9:
+            reasons.append(
+                "The AI could not verify this claim with sufficient confidence."
+            )
+        if not policy["auto_accept"]:
+            reasons.append("Automatic acceptance is disabled by the applicable policy.")
+        expected_ids = {e["id"] for e in evidence}
+        if (
+            set(assessment.evidence_ids) != expected_ids
+            or set(investigation.evidence_ids) != expected_ids
+        ):
+            reasons.append(
+                "The investigation did not substantiate all supplied evidence."
+            )
+        accept = (
+            not reasons
+            and assessment.recommendation == "accept"
+            and investigation.recommendation == "accept"
+        )
+        recommendation = "accept" if accept else "reject"
+        if not accept and not policy["auto_reject"]:
+            raise DomainError(
+                "Policy forbids autonomous rejection; no decision was recorded", 409
+            )
+        explanation = assessment.explanation
+        if reasons:
+            explanation += " Autonomous decision: rejected. " + " ".join(
+                dict.fromkeys(reasons)
+            )
+        return assessment.model_copy(
+            update={
+                "recommendation": recommendation,
+                "unresolved_questions": [],
+                "explanation": explanation,
+            }
+        )
+
     def failure(self, claim_id, run_id, settings, duration, error, trajectory):
         self.repo.rollback()
         self.repo.add(
@@ -229,11 +307,17 @@ class ClaimService:
         duration,
         trajectory,
         context,
+        autonomous=False,
     ):
         with span("service.controlled_action", run_id):
             claim = self.claim(claim_id, lock=True)
             self.version(claim, expected)
-            if claim.status != "submitted":
+            allowed = (
+                {"submitted", "pending_manager_review", "information_requested"}
+                if autonomous
+                else {"submitted"}
+            )
+            if claim.status not in allowed:
                 raise DomainError("Claim has already been processed")
             self.assert_context_current(claim_id, context)
             checks = self.calculate_policy_checks(claim_id)
@@ -244,12 +328,26 @@ class ClaimService:
                 assessment.evidence_ids
             ) <= {e["id"] for e in evidence}:
                 raise DomainError("Assessment sources changed; reassessment required")
+            if autonomous:
+                assessment = self.autonomous_assessment(
+                    assessment, context, checks, policy, evidence
+                )
             saved = self.repo.add(
                 m.ClaimAssessment(
                     claim_id=claim_id,
                     claim_version=expected,
                     run_id=run_id,
-                    data=assessment.model_dump(),
+                    data={
+                        **assessment.model_dump(),
+                        **(
+                            {
+                                "investigation": context["investigation"],
+                                "decision_mode": "autonomous",
+                            }
+                            if autonomous
+                            else {}
+                        ),
+                    },
                 )
             )
             self.repo.flush()
@@ -268,7 +366,38 @@ class ClaimService:
                 {"recommendation": assessment.recommendation},
             )
             clear = assessment.confidence >= 0.9 and not assessment.unresolved_questions
-            if (
+            if autonomous:
+                task = self.repo.active_review(claim_id)
+                if task:
+                    task.active = False
+                    task.status = "closed_by_ai"
+                    self.repo.add(
+                        m.ReviewDecision(
+                            review_id=task.id,
+                            actor="ai_investigator",
+                            decision=assessment.recommendation,
+                            rationale=assessment.explanation,
+                        )
+                    )
+                if assessment.recommendation == "accept":
+                    self.accept_claim(claim, policy, checks, assessment, run_id)
+                    trajectory.append("accept_claim")
+                else:
+                    self.reject_claim(
+                        claim, policy, checks, assessment, run_id, autonomous=True
+                    )
+                    trajectory.append("reject_claim")
+                self.audit(
+                    claim_id,
+                    "autonomous_decision_recorded",
+                    "ai_investigator",
+                    run_id,
+                    {
+                        "decision": assessment.recommendation,
+                        "reason": assessment.explanation,
+                    },
+                )
+            elif (
                 assessment.recommendation == "accept"
                 and clear
                 and all(f["severity"] == "pass" for f in checks)
@@ -301,7 +430,12 @@ class ClaimService:
                     model=response.model,
                     status="succeeded",
                     duration_ms=duration,
-                    usage=response.usage,
+                    usage={
+                        "assessment": response.usage,
+                        "investigation": context.get("investigation_usage", {}),
+                    }
+                    if autonomous
+                    else response.usage,
                     trajectory=list(trajectory),
                 )
             )
@@ -330,13 +464,13 @@ class ClaimService:
             run_id,
             {"previous": previous, "result": claim.status},
         )
-        self.capture_outcome(claim, assessment, "", False)
+        self.capture_outcome(claim, assessment, assessment.explanation, False)
 
-    def reject_claim(self, claim, policy, checks, assessment, run_id):
+    def reject_claim(self, claim, policy, checks, assessment, run_id, autonomous=False):
         if (
             not policy["auto_reject"]
             or assessment.recommendation != "reject"
-            or not any(f["severity"] == "reject" for f in checks)
+            or (not autonomous and not any(f["severity"] == "reject" for f in checks))
         ):
             raise DomainError("Automatic rejection blocked")
         previous = claim.status
@@ -348,7 +482,7 @@ class ClaimService:
             run_id,
             {"previous": previous, "result": claim.status},
         )
-        self.capture_outcome(claim, assessment, "", False)
+        self.capture_outcome(claim, assessment, assessment.explanation, False)
 
     def investigation_reason(self, claim_id, assessment):
         reasons = [
