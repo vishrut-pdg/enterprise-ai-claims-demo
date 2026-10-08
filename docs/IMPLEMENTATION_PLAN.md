@@ -85,3 +85,10 @@ Validation: 54 backend tests including PostgreSQL/Redis, 11 frontend tests, lint
 The user explicitly narrowed this branch after merging Week 3 into Week 2: AI only recommends accept/reject, never investigates or executes a final decision. Every expense requires manager acceptance/rejection. This instruction supersedes the historical frozen execution scope for this branch. Removed automatic decision service paths and request-information actions; all recommendations create manager review. Added Week 2 labels, policy, dedicated database/queue and setup guide in docs/Week2.md. Week 3 and Week 4 branches remain unchanged.
 
 Verification: 64 backend tests (including PostgreSQL/Redis), 11 frontend tests, 20/20 mock evals, lint/build, and browser flow passed. All seven recommendations wait for approval; manager overrides work both ways. Dedicated Week 2 demo storage and policy index prepared; verification servers stopped. Live Vertex generation was not rerun.
+
+
+## Week 1 scope correction — 2026-10-08
+
+After merging Week 2 into Week 1, the user explicitly restricted AI to summarizing expense facts and answering clarifying questions. The manager chooses Accept/Reject/Investigate. This supersedes historical recommendation/execution scope on this branch. Removed the model recommendation field, added structured factual summary output, neutral policy-check labels and manager-owned persistent investigation. Investigation remains active and creates no terminal outcome; all manager actions advance the claim version. Retained grounded read-only chat, source validation and role/concurrency controls. Week 1 storage/queue are separate and other branches are unchanged. docs/Week1.md is the current setup and behavior guide.
+
+Verification: 66 backend tests including PostgreSQL/Redis, 11 frontend tests, 20 mock evals, lint/build and browser flow passed. Browser covered facts-only outputs, clarifying chat, investigation across refresh and final manager decisions. Verification servers shut down. Live Vertex generation was not rerun.

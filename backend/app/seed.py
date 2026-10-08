@@ -21,7 +21,7 @@ def seed(session):
         repo.add(
             m.Policy(
                 id="expense-policy",
-                name="Employee expenses — manager approval",
+                name="Employee expenses — factual briefing",
                 text="USD expenses up to $500. Meals, travel and supplies only. A verified receipt is required for every line. Submit within 90 days. Duplicates require review.",
                 currency="USD",
                 auto_accept=False,

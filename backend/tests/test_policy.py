@@ -8,7 +8,7 @@ from app.domain.policy import calculate_checks
 
 def test_seed_checks(service):
     assert service.calculate_policy_checks("CLM-001")[0]["code"] == "compliant"
-    assert service.calculate_policy_checks("CLM-002")[0]["severity"] == "reject"
+    assert service.calculate_policy_checks("CLM-002")[0]["severity"] == "issue"
     assert service.calculate_policy_checks("CLM-003")[0]["code"] == "receipt_required"
 
 

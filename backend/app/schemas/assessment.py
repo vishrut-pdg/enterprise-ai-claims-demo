@@ -5,7 +5,6 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 class Assessment(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
-    recommendation: Literal["accept", "reject"]
     confidence: float = Field(ge=0, le=1, allow_inf_nan=False)
     findings: list[str] = Field(
         description="Exact deterministic check codes from checks[].code; no narrative text",
@@ -15,7 +14,7 @@ class Assessment(BaseModel):
         description="Exact IDs of supporting evidence from evidence[].id; empty when none exists"
     )
     unresolved_questions: list[str]
-    explanation: str = Field(min_length=1, max_length=8000)
+    summary: str = Field(min_length=1, max_length=8000)
 
 
 class ProcessRequest(BaseModel):
@@ -23,7 +22,7 @@ class ProcessRequest(BaseModel):
 
 
 class ManagerRequest(ProcessRequest):
-    decision: Literal["accept", "reject"]
+    decision: Literal["accept", "reject", "investigate"]
     rationale: str = Field(min_length=3, max_length=4000)
 
     @field_validator("rationale")

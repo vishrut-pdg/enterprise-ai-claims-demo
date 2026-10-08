@@ -162,6 +162,8 @@ async def run_suite(provider_name="mock"):
                     assessment = result["assessment"]["data"]
                     return {
                         "expected_final_status": result["status"] == case["expected"],
+                        "no_ai_recommendation": "recommendation" not in assessment,
+                        "facts_summary_present": bool(assessment["summary"]),
                         "grounded_findings": set(assessment["findings"])
                         <= {f["code"] for f in result["findings"]},
                         "grounded_evidence": set(assessment["evidence_ids"])
@@ -221,6 +223,17 @@ async def run_suite(provider_name="mock"):
 
             async def manager():
                 claim = svc.detail("CLM-003")
+                investigation = svc.manager_decision(
+                    claim["review"]["id"],
+                    ManagerRequest(
+                        expected_version=claim["version"],
+                        decision="investigate",
+                        rationale="Manager is checking the supplied evidence.",
+                    ),
+                    "eval-manager",
+                    "eval-investigate-run",
+                )
+                claim = svc.detail("CLM-003")
                 result = svc.manager_decision(
                     claim["review"]["id"],
                     ManagerRequest(
@@ -233,6 +246,9 @@ async def run_suite(provider_name="mock"):
                 )
                 detail = svc.detail("CLM-003")
                 return {
+                    "investigation_remains_open": investigation["active"],
+                    "no_final_investigation_outcome": investigation["claim"]["outcome"]
+                    is None,
                     "review_closed": not result["active"],
                     "claim_accepted": detail["status"] == "accepted",
                     "reviewed_memory": detail["outcome"]["reviewed"],
@@ -256,7 +272,9 @@ async def run_suite(provider_name="mock"):
                             svc,
                             "CLM-001",
                             1,
-                            Settings(llm_provider="mock", rag_enabled=False, _env_file=None),
+                            Settings(
+                                llm_provider="mock", rag_enabled=False, _env_file=None
+                            ),
                             provider=FaultProvider(fault),
                         )
                     except DomainError:

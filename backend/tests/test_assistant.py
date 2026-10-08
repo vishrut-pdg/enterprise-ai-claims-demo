@@ -54,6 +54,6 @@ def test_seed_adds_missing_samples_without_overwriting(service):
     )
     assert service.calculate_policy_checks("CLM-004")[0]["code"] == "compliant"
     assert any(
-        f["severity"] == "reject" for f in service.calculate_policy_checks("CLM-006")
+        f["severity"] == "issue" for f in service.calculate_policy_checks("CLM-006")
     )
     assert service.calculate_policy_checks("CLM-007")[0]["code"] == "receipt_required"

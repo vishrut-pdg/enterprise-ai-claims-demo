@@ -21,7 +21,7 @@ class ClaimAgent(BaseAgent):
     def __init__(self, tools, gateway):
         super().__init__(
             name="claim_processor",
-            description="Ground facts, recommend a decision, then request manager approval",
+            description="Ground and summarize facts for manager review",
         )
         self._tools, self._gateway = tools, gateway
 
@@ -68,5 +68,5 @@ class ClaimAgent(BaseAgent):
             yield Event(
                 author=self.name,
                 actions=EventActions(state_delta={"result": result}),
-                custom_metadata={"recommendation": assessment.recommendation},
+                custom_metadata={"facts_summarized": True},
             )

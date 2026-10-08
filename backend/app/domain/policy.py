@@ -37,7 +37,7 @@ def calculate_checks(
     ):
         add(
             "amount_validity",
-            "reject",
+            "issue",
             "Amounts must be positive and claim lines must exist.",
         )
     if (
@@ -46,7 +46,7 @@ def calculate_checks(
     ):
         add(
             "amount_total",
-            "reject",
+            "issue",
             "Claim total does not equal the sum of line amounts.",
         )
     if claim["currency"] != policy["currency"]:
@@ -56,13 +56,13 @@ def calculate_checks(
             "Currency differs from policy; conversion evidence is missing.",
         )
     if amount > Decimal(str(rules["amount_limit"]["maximum"])):
-        add("amount_limit", "reject", "Claim exceeds the policy amount limit.")
+        add("amount_limit", "issue", "Claim exceeds the policy amount limit.")
     allowed = rules["allowed_category"]["categories"]
     for line in claim["lines"]:
         if line["category"] not in allowed:
             add(
                 "allowed_category",
-                "reject",
+                "issue",
                 f"Category {line['category']} is not reimbursable.",
             )
         expense_date = date.fromisoformat(line["expense_date"])
@@ -70,7 +70,7 @@ def calculate_checks(
         if expense_date > today or expense_date > submitted or submitted > today:
             add(
                 "date_validity",
-                "reject",
+                "issue",
                 "Expense/submission date is in the future or expense follows submission.",
             )
         elif (submitted - expense_date).days > rules["date_validity"][
@@ -78,7 +78,7 @@ def calculate_checks(
         ]:
             add(
                 "date_validity",
-                "reject",
+                "issue",
                 "Expense was submitted after the allowed period.",
             )
         receipts = [

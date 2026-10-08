@@ -1,21 +1,21 @@
-# Week 2 expense policy — AI advice, manager decisions
+# Week 1 expense facts — manager decisions
 
 ## Eligible categories
 
-Reimbursable categories are meals, travel and supplies. Personal entertainment is not reimbursable. The AI explains category findings and recommends accept or reject. Every claim goes to the manager regardless of its recommendation.
+The policy lists meals, travel and supplies as reimbursable categories. Personal entertainment is outside the list. AI describes the claim category and the policy list without recommending a decision.
 
 ## Currency and claim amount
 
-Expenses use USD, positive line amounts and a positive total equal to the sum of lines. The maximum is USD 500 per claim. Unsupported currency conversion or amounts above the limit support a reject recommendation. Only the manager decides the claim.
+Policy currency is USD. Claim and line amounts must be positive; the total must equal the sum of lines. The amount limit is USD 500 per claim. AI reports the recorded amounts, currency and calculated check results, without doing its own arithmetic or deciding the expense.
 
 ## Receipt evidence
 
-A verified receipt must support every expense line. Missing, unverified or duplicate receipt evidence is reported as an unmet requirement and supports a reject recommendation. The AI does not investigate, collect documents or fabricate verification. The manager reviews the supplied records and accepts or rejects.
+Policy requires a verified receipt for every expense line. AI summarizes which receipts are supplied, their verification metadata and any missing or duplicate evidence. It cannot obtain receipts or invent verification. Missing evidence is a fact, not an AI recommendation to reject or investigate.
 
 ## Expense and submission dates
 
-Submit within 90 days of the expense date. Expense dates must not follow submission or be in the future. These checks inform the AI recommendation; they never execute a decision.
+The submission window is 90 days. Expense dates cannot follow submission or be in the future. AI reports dates and computed findings to clarify the records.
 
 ## Manager decision
 
-All AI outputs are recommendations, including clear accepts and rejects. All successfully assessed claims remain pending manager review. The manager records Accept or Reject with a rationale. There is no investigation stage, request-information action or automatic acceptance/rejection. Final decisions, manager identity and rationale are audited and become reviewed outcome memory.
+AI summarizes facts only. The manager chooses Accept, Reject or Investigate, with a rationale. Investigate keeps the review open and creates no final outcome. The manager can subsequently accept or reject. The chatbot answers clarifying questions from the supplied records and policy, cites sources, and never recommends or executes decisions. Manager actions and final outcomes are audited.

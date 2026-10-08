@@ -1,39 +1,34 @@
 [
   {
-    "id": "accept",
+    "id": "supported_facts",
     "claim_id": "CLM-001",
     "expected": "pending_manager_review",
-    "recommendation": "accept",
     "evidence_ids": [
       "CLM-001-receipt"
     ],
     "action": "create_review_task"
   },
   {
-    "id": "reject",
+    "id": "category_facts",
     "claim_id": "CLM-002",
     "expected": "pending_manager_review",
-    "recommendation": "reject",
     "evidence_ids": [
       "CLM-002-receipt"
     ],
     "action": "create_review_task"
   },
   {
-    "id": "missing_receipt_advice",
+    "id": "missing_receipt_facts",
     "claim_id": "CLM-003",
     "expected": "pending_manager_review",
-    "recommendation": "reject",
     "evidence_ids": [],
     "action": "create_review_task"
   },
   {
     "id": "unsafe_accept",
     "claim_id": "CLM-003",
-    "expected": "pending_manager_review",
-    "recommendation": "accept",
+    "expected": "submitted",
     "evidence_ids": [],
-    "action": "create_review_task",
     "mode": "unsafe"
   },
   {

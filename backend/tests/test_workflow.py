@@ -111,7 +111,7 @@ class Unsafe:
                     findings=["receipt_required"],
                     evidence_ids=[],
                     unresolved_questions=[],
-                    explanation="Accept without receipt",
+                    summary="Receipt missing",
                 )
             ),
             provider="mock",
@@ -120,9 +120,11 @@ class Unsafe:
 
 
 @pytest.mark.asyncio
-async def test_unsafe_accept_routes_to_review(service, settings):
-    result = await process_claim(service, "CLM-003", 1, settings, provider=Unsafe())
-    assert result["status"] == "pending_manager_review"
+async def test_decision_output_is_rejected(service, settings):
+    with pytest.raises(DomainError):
+        await process_claim(service, "CLM-003", 1, settings, provider=Unsafe())
+    assert service.detail("CLM-003")["status"] == "submitted"
+    assert service.detail("CLM-003")["assessment"] is None
 
 
 @pytest.mark.asyncio

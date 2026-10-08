@@ -1,9 +1,7 @@
-# Enterprise AI Claims — Week 2
+# Enterprise AI Claims — Week 1
 
-AI recommends **Accept or Reject** for every expense. The manager makes every final decision. No AI investigation or automatic decision is executed.
+AI states and summarizes expense facts. The manager chooses **Accept, Reject or Investigate** for each claim. The chatbot answers clarifying questions with source references.
 
-Start with [Week 2 setup, workflow and code guide](docs/Week2.md). The app provides a claim queue, AI recommendations with policy/evidence references, manager Accept/Reject controls, a read-only chatbot and audited outcomes.
+There are no AI recommendations, AI investigations or automatic decisions. Investigate leaves the manager review open until a final Accept or Reject action.
 
-Week 2 uses its own database `claims_week2` and worker queue `claims-week2`. The completed Week 3 and autonomous Week 4 applications remain on their separate branches. Older docs are historical records; [Week2.md](docs/Week2.md) describes this branch.
-
-After dependency and database setup, run `bash scripts/demo.sh` or follow the three manual terminal commands in the guide. Open http://127.0.0.1:5173, click Run for recommendations, then decide each expense in Manager review.
+See [Week 1 setup and code guide](docs/Week1.md). Week 1 uses its own `claims_week1` database and `claims-week1` queue. Weeks 2–4 remain on separate branches. After setup, run `bash scripts/demo.sh`, open http://127.0.0.1:5173, click Run for fact summaries, and use Manager review for decisions.

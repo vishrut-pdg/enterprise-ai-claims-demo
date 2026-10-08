@@ -1,4 +1,4 @@
-"""Create the separate local Week 2 database without touching other weeks’ data."""
+"""Create the separate local Week 1 database without touching other weeks’ data."""
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
@@ -11,8 +11,8 @@ def main():
     url = make_url(settings.database_url)
     if url.get_backend_name() != "postgresql":
         return
-    if url.database in {"claims", "claims_week4"}:
-        raise ValueError("Week 2 must use a separate database, such as claims_week2")
+    if url.database in {"claims", "claims_week2", "claims_week4"}:
+        raise ValueError("Week 1 must use a separate database, such as claims_week1")
     admin = create_engine(url.set(database="postgres"), isolation_level="AUTOCOMMIT")
     try:
         with admin.connect() as connection:
@@ -25,7 +25,7 @@ def main():
                     url.database
                 )
                 connection.execute(text("CREATE DATABASE " + name))
-        print("Week 2 database ready")
+        print("Week 1 database ready")
     finally:
         admin.dispose()
 

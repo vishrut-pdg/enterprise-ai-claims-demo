@@ -69,7 +69,7 @@ async def run_evaluation():
             assert result["status"] == case["expected"], case["id"]
             assert result["policy"]["id"] == "expense-policy"
             assert [e["id"] for e in result["evidence"]] == case["evidence_ids"]
-            if case.get("mode") in ("invalid", "stale"):
+            if case.get("mode") in ("invalid", "stale", "unsafe"):
                 assert (
                     failed
                     and result["assessment"] is None
@@ -77,10 +77,8 @@ async def run_evaluation():
                 )
             else:
                 assert result["assessment"]["claim_version"] == 1
-                assert (
-                    result["assessment"]["data"]["recommendation"]
-                    == case["recommendation"]
-                )
+                assert "recommendation" not in result["assessment"]["data"]
+                assert result["assessment"]["data"]["summary"]
                 trajectory = result["executions"][0]["trajectory"]
                 assert trajectory == RETRIEVAL + ["assess", case["action"]]
                 assert set(result["assessment"]["data"]["findings"]) <= {

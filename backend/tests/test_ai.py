@@ -14,17 +14,16 @@ from app.schemas.assessment import Assessment
         {"confidence": float("nan")},
         {"recommendation": "approve"},
         {"extra": "value"},
-        {"explanation": ""},
+        {"summary": ""},
     ],
 )
 def test_schema(update):
     data = dict(
-        recommendation="accept",
         confidence=0.9,
         findings=["compliant"],
         evidence_ids=[],
         unresolved_questions=[],
-        explanation="Compliant",
+        summary="Compliant",
     )
     data.update(update)
     with pytest.raises(ValidationError):
@@ -42,7 +41,7 @@ async def test_mock_contract(service, settings):
     result, response = await LLMGateway(create_provider(settings), settings).assess(
         context, "test"
     )
-    assert result.recommendation == "accept" and response.provider == "mock"
+    assert bool(result.summary) and response.provider == "mock"
 
 
 @pytest.mark.parametrize("name", ["mock", "ollama", "vertex", "btp"])

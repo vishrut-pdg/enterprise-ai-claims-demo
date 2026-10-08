@@ -27,6 +27,10 @@ def encode(entity):
         result[col.name] = (
             json.loads(json.dumps(value)) if isinstance(value, (dict, list)) else value
         )
+    if isinstance(entity, m.OutcomeRecord):
+        result.pop(
+            "recommendation", None
+        )  # Legacy storage field; Week 1 has no AI advice.
     return result
 
 
@@ -172,7 +176,7 @@ class ClaimService:
             "policy_selected",
             "evidence_retrieved",
             "checks_executed",
-            "ai_assessment_requested",
+            "ai_summary_requested",
         ):
             self.audit(
                 claim_id,
@@ -185,7 +189,7 @@ class ClaimService:
                     "evidence_ids": [e["id"] for e in context["evidence"]],
                     **(
                         {"policy_passages": context.get("policy_passages", [])}
-                        if event == "ai_assessment_requested"
+                        if event == "ai_summary_requested"
                         else {}
                     ),
                 },
@@ -254,17 +258,17 @@ class ClaimService:
             self.repo.flush()
             self.audit(
                 claim_id,
-                "ai_assessment_validated",
+                "ai_summary_validated",
                 "system",
                 run_id,
                 {"assessment_id": saved.id},
             )
             self.audit(
                 claim_id,
-                "recommendation_produced",
+                "facts_summarized",
                 "claim_agent",
                 run_id,
-                {"recommendation": assessment.recommendation},
+                {"summary_id": saved.id},
             )
             self.create_review_task(claim, saved, assessment, run_id)
             trajectory.append("create_review_task")
@@ -297,7 +301,7 @@ class ClaimService:
                     claim_id=claim.id,
                     assessment_id=saved.id,
                     reason="Manager approval is required for every expense claim. "
-                    + assessment.explanation,
+                    + assessment.summary,
                     evidence_ids=assessment.evidence_ids,
                     unresolved_questions=assessment.unresolved_questions,
                 )
@@ -322,7 +326,7 @@ class ClaimService:
                 reviewed=reviewed,
                 context=context,
                 findings=self.calculate_policy_checks(claim.id),
-                recommendation=assessment.recommendation,
+                recommendation="not_applicable",
                 final_decision=claim.status,
                 reviewer_rationale=rationale,
                 evidence_ids=assessment.evidence_ids,
@@ -355,7 +359,7 @@ class ClaimService:
         self.version(claim, request.expected_version)
         if not task.active or claim.status not in (
             "pending_manager_review",
-            "information_requested",
+            "under_investigation",
         ):
             raise DomainError("Review is already closed")
         self.repo.add(
@@ -367,15 +371,21 @@ class ClaimService:
             )
         )
         previous = claim.status
-        task.active = False
-        task.status = "closed"
-        claim.status = "accepted" if request.decision == "accept" else "rejected"
-        from app.schemas.assessment import Assessment
+        # Advance the version for every manager action, including a repeated investigation.
+        claim.version += 1
+        if request.decision == "investigate":
+            task.status = "under_investigation"
+            claim.status = "under_investigation"
+        else:
+            task.active = False
+            task.status = "closed"
+            claim.status = "accepted" if request.decision == "accept" else "rejected"
+            from app.schemas.assessment import Assessment
 
-        assessment = Assessment.model_validate(
-            self.repo.get(m.ClaimAssessment, task.assessment_id).data
-        )
-        self.capture_outcome(claim, assessment, request.rationale, True)
+            assessment = Assessment.model_validate(
+                self.repo.get(m.ClaimAssessment, task.assessment_id).data
+            )
+            self.capture_outcome(claim, assessment, request.rationale, True)
         self.audit(
             claim.id,
             "manager_decision_recorded",
