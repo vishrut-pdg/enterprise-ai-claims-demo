@@ -1,0 +1,13 @@
+# Platform-neutral deployment contract; platform descriptors live in deploy/.
+application:
+  name: enterprise-ai-claims
+  runtime: python3.12
+  entrypoint: uvicorn app.main:app --host 0.0.0.0 --port 8000
+  worker: arq app.jobs.worker.WorkerSettings
+  migrations: alembic upgrade head
+  dependencies: [postgresql, redis]
+  configuration: .env.example
+platforms:
+  local: deploy/local/README.md
+  btp: deploy/btp/manifest.yml
+  gcp: deploy/gcp/service.yaml

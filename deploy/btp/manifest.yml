@@ -1,0 +1,16 @@
+---
+applications:
+  - name: enterprise-ai-claims
+    path: ../../backend
+    memory: 1G
+    disk_quota: 2G
+    buildpacks: [python_buildpack]
+    command: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    env:
+      APP_ENV: btp
+      LLM_PROVIDER: btp
+      LLM_MODEL: gpt-4o
+      OTEL_SERVICE_NAME: enterprise-ai-claims
+# Export locked requirements with `uv export --no-dev --no-hashes -o requirements.txt`
+# and supply DATABASE_URL, REDIS_URL and BTP OAuth/inference settings securely.
+# Register a separate worker app with command `arq app.jobs.worker.WorkerSettings`.

@@ -1,0 +1,2 @@
+# Cloud Run portability
+Build the root Dockerfile, push to Artifact Registry, replace descriptor placeholders and deploy. Configure Cloud SQL PostgreSQL, Memorystore Redis, networking and Secret Manager. Grant runtime ADC identity Vertex inference access. Run Alembic as a deployment job before API traffic. Run ARQ in a separate persistent worker. Host frontend static build with an HTTPS API URL. Integrate authenticated manager identity before public access. These steps are platform preparation, not a deployed cloud environment.

@@ -1,0 +1,2 @@
+import { defineConfig } from '@playwright/test'
+export default defineConfig({testDir:'./e2e',workers:1,use:{baseURL:'http://127.0.0.1:5174',trace:'retain-on-failure'},webServer:[{command:'node scripts/e2e-backend.mjs',url:'http://127.0.0.1:8001/api/health',reuseExistingServer:false,timeout:60000},{command:'pnpm dev --port 5174',url:'http://127.0.0.1:5174',env:{BACKEND_URL:'http://127.0.0.1:8001'},reuseExistingServer:false,timeout:30000}]})

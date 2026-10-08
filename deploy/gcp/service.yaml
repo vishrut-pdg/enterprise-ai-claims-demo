@@ -1,0 +1,24 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: enterprise-ai-claims
+spec:
+  template:
+    spec:
+      containers:
+        - image: REGION-docker.pkg.dev/PROJECT/REPOSITORY/enterprise-ai-claims:latest
+          ports:
+            - containerPort: 8000
+          env:
+            - name: APP_ENV
+              value: gcp
+            - name: LLM_PROVIDER
+              value: vertex
+            - name: LLM_MODEL
+              value: gemini-2.5-flash
+            - name: GCP_PROJECT_ID
+              value: PROJECT
+            - name: GCP_LOCATION
+              value: us-central1
+# Supply database/Redis URLs via Secret Manager and a service account with Vertex access.
+# Provision a separate always-on ARQ worker; do not run it in request-only Cloud Run.
