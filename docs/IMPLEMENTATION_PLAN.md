@@ -59,3 +59,22 @@ Exact tested setup is in root README. PostgreSQL/Redis: `docker compose up -d`. 
 
 ### Remaining BTP/GCP deployment work
 Provide real model deployments/credentials, database/Redis services, secure secret injection, authenticated reviewer identity, IAM/networking, frontend hosting and persistent worker processes. Replace GCP image/project placeholders; stage BTP Python runtime template with buildpack inputs. Apply migrations before serving traffic. Descriptors are prepared, not cloud deployments. No cloud resources were provisioned.
+
+
+## UX, assistant and batch follow-up — 8 October 2026
+
+Implemented on `week-3`: seven additive seed claims (CLM-004 through CLM-007 added to existing local data); assessment/investigation/manager completion feedback; compact read-only provider-neutral assistant with validated citations; worker heartbeat checks and explicit offline error; unique retryable batch IDs; job-status endpoint, per-claim outcomes, progress polling and automatic queue refresh. No frozen architecture/product document was changed. Existing decisions are preserved by seeding.
+
+Verification: 48 backend tests passed including PostgreSQL/Redis integration; 8 frontend tests passed; lint and production build passed; expanded Chromium E2E verified actual four-claim ARQ processing, manager feedback and chatbot citations. Tests use mock inference and isolated schemas/queues. New chat has not been live-tested against Vertex; it uses the existing provider adapter/credentials. Dev servers and workers are shut down after validation; database services remain available.
+
+## Policy RAG and persistent batch status
+
+Add the readable expense policy, section-level ingestion with Vertex embeddings, a pgvector migration and cosine retrieval filtered to the applicable policy/model. Supply passages to assessment and read-only chat while retaining deterministic rule authority. Audit retrieved passages with assessment requests. Test retrieval, idempotent ingestion, model mismatch and PostgreSQL vector queries. Persist browser-tab batch job IDs and verify progress survives reload. Provide the codebase guide and shut down verification servers after completion.
+
+Validation completed: 53 backend tests including isolated PostgreSQL/Redis checks, 8 frontend tests, browser E2E with batch reload persistence, lint and frontend build. Live Vertex policy ingestion and retrieval succeeded (five 768-dimensional vectors; receipt passage ranked first). Compared claims, assessments, reviews, decisions, outcomes, audit and executions against the pre-upgrade backup: unchanged. RAG enabled in this worktree's ignored local .env. Development servers and workers stopped; PostgreSQL/Redis remain running.
+
+## Demo refinement
+
+Queue controls now display Run / Running / Finished, with animated execution feedback, active Redis job discovery (including legacy jobs), per-job states/outcomes, refresh persistence and explicit offline readiness. Removed individual assessment controls and placed the chatbot inline on every claim. Collapsed verbose audit event details. Added scripts/demo.sh to start the correct checkout's API, ARQ worker and frontend, update pgvector services, migrate, seed and refresh a changed policy index; trap-based shutdown was smoke-tested with an isolated worker queue.
+
+Validation: 54 backend tests including PostgreSQL/Redis, 11 frontend tests, lint/build and the full browser batch/chat/review scenario. The same seven-claim browser scenario passed with live Vertex AI generation and Vertex policy embeddings/RAG (7 complete, 0 failed), using an isolated test database; a final mock browser run passed as well. The expanded 15-section user policy was preserved and reindexed. Stopped old PDG checkout servers and all verification servers/workers; demo data was not reset by these checks.

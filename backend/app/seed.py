@@ -8,43 +8,49 @@ from app.db.session import SessionLocal
 
 def seed(session):
     repo = ClaimRepository(session)
-    if repo.get(m.Policy, "expense-policy"):
-        return
-    repo.add(
-        m.Employee(
-            id="employee-1",
-            name="Alex Morgan",
-            email="alex@example.test",
-            department="Customer Success",
-        )
-    )
-    repo.add(
-        m.Policy(
-            id="expense-policy",
-            name="Employee expenses v1",
-            text="USD expenses up to $500. Meals, travel and supplies only. A verified receipt is required for every line. Submit within 90 days. Duplicates require review.",
-            currency="USD",
-            auto_accept=True,
-            auto_reject=True,
-        )
-    )
-    repo.flush()
-    for code, params in [
-        ("amount_limit", {"maximum": "500.00"}),
-        ("receipt_required", {"required": True}),
-        ("allowed_category", {"categories": ["meals", "travel", "supplies"]}),
-        ("date_validity", {"maximum_age_days": 90}),
-    ]:
+    existing_policy = bool(repo.get(m.Policy, "expense-policy"))
+    if not existing_policy:
         repo.add(
-            m.PolicyRule(
-                id=code, policy_id="expense-policy", code=code, parameters=params
+            m.Employee(
+                id="employee-1",
+                name="Alex Morgan",
+                email="alex@example.test",
+                department="Customer Success",
             )
         )
+        repo.add(
+            m.Policy(
+                id="expense-policy",
+                name="Employee expenses v1",
+                text="USD expenses up to $500. Meals, travel and supplies only. A verified receipt is required for every line. Submit within 90 days. Duplicates require review.",
+                currency="USD",
+                auto_accept=True,
+                auto_reject=True,
+            )
+        )
+        repo.flush()
+        for code, params in [
+            ("amount_limit", {"maximum": "500.00"}),
+            ("receipt_required", {"required": True}),
+            ("allowed_category", {"categories": ["meals", "travel", "supplies"]}),
+            ("date_validity", {"maximum_age_days": 90}),
+        ]:
+            repo.add(
+                m.PolicyRule(
+                    id=code, policy_id="expense-policy", code=code, parameters=params
+                )
+            )
     for claim_id, title, amount, category, receipt in [
         ("CLM-001", "Client lunch", "84.50", "meals", True),
         ("CLM-002", "Personal entertainment", "125.00", "entertainment", True),
         ("CLM-003", "Airport taxi — receipt missing", "62.00", "travel", False),
+        ("CLM-004", "Office stationery", "48.25", "supplies", True),
+        ("CLM-005", "Conference rail ticket", "186.00", "travel", True),
+        ("CLM-006", "Hotel stay above allowance", "680.00", "travel", True),
+        ("CLM-007", "Team lunch — receipt missing", "115.00", "meals", False),
     ]:
+        if repo.get(m.Claim, claim_id):
+            continue
         repo.add(
             m.Claim(
                 id=claim_id,
@@ -88,7 +94,9 @@ def seed(session):
 def main():
     with SessionLocal() as session:
         seed(session)
-    print("Seed ready: CLM-001 accept, CLM-002 reject, CLM-003 investigate")
+    print(
+        "Seven sample claims ready: CLM-001 through CLM-007 (existing decisions preserved)"
+    )
 
 
 if __name__ == "__main__":

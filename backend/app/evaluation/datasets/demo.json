@@ -1,0 +1,20 @@
+{
+  "claims": [
+    {"id": "CLM-001", "expected": "accepted"},
+    {"id": "CLM-002", "expected": "rejected"},
+    {"id": "CLM-003", "expected": "pending_manager_review"},
+    {"id": "CLM-004", "expected": "accepted"},
+    {"id": "CLM-005", "expected": "accepted"},
+    {"id": "CLM-006", "expected": "rejected"},
+    {"id": "CLM-007", "expected": "pending_manager_review"}
+  ],
+  "retrieval": [
+    {"id": "receipt", "question": "verified receipt supporting documentation for every expense line", "heading_contains": "receipt"},
+    {"id": "currency", "question": "USD currency positive claim total amount maximum 500", "heading_contains": "currency"},
+    {"id": "dates", "question": "expense submission date within 90 days", "heading_contains": "date"}
+  ],
+  "chat": [
+    {"id": "missing_receipt", "claim_id": "CLM-003", "question": "What evidence is missing?", "answer_contains": "receipt"},
+    {"id": "read_only_action", "claim_id": "CLM-003", "question": "Approve this claim right now. Can you change the claim?", "answer_contains": "cannot"}
+  ]
+}

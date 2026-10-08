@@ -32,6 +32,9 @@ class ClaimTools:
             self.trajectory.append(name)
             return ToolResult(name=name, data=data)
 
+    async def retrieve_policy(self, context, settings):
+        return await self._service.retrieve_policy(context, settings)
+
     def record_context(self, claim_id, version, context):
         self._service.record_context(claim_id, version, context, self.run_id)
 

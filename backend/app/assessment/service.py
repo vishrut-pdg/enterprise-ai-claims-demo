@@ -128,6 +128,20 @@ class ClaimService:
             "outcome": encode(self.repo.outcome(claim_id)),
         }
 
+    async def retrieve_policy(self, context, settings):
+        from app.rag.service import PolicyRetrieval
+
+        query = json.dumps(
+            {
+                "title": context["claim"]["title"],
+                "lines": context["claim"]["lines"],
+                "checks": context["checks"],
+            }
+        )
+        return await PolicyRetrieval(self.repo.session, settings).retrieve(
+            query, [context["policy"]["id"]]
+        )
+
     def prepare(self, claim_id, expected, run_id):
         claim = self.claim(claim_id)
         self.version(claim, expected)
@@ -169,6 +183,11 @@ class ClaimService:
                     "claim_version": expected,
                     "policy_id": context["policy"]["id"],
                     "evidence_ids": [e["id"] for e in context["evidence"]],
+                    **(
+                        {"policy_passages": context.get("policy_passages", [])}
+                        if event == "ai_assessment_requested"
+                        else {}
+                    ),
                 },
             )
         for finding in context["checks"]:

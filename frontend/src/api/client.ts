@@ -1,4 +1,4 @@
-import type { Claim, ClaimDetail, Review, ReviewDetail, Outcome } from '../types/claims'
+import type { Claim, ClaimDetail, Review, ReviewDetail, Outcome, BatchResult, BatchJob, BatchProgress, ChatTurn, ChatReply } from '../types/claims'
 const base = import.meta.env.VITE_API_URL ?? '/api'
 export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(base + path, {...options, headers: {'Content-Type': 'application/json', 'X-Role': 'manager', 'X-Actor': 'local-manager', ...options.headers}})
@@ -14,5 +14,8 @@ export const api = {
   review: (id: string) => request<ReviewDetail>(`/reviews/${encodeURIComponent(id)}`),
   decide: (id: string, version: number, decision: string, rationale: string) => request<ReviewDetail>(`/reviews/${encodeURIComponent(id)}/decisions`, {method: 'POST', body: JSON.stringify({expected_version: version, decision, rationale})}),
   memory: (id: string) => request<Outcome[]>(`/claims/${encodeURIComponent(id)}/memory`),
-  batch: (ids: string[]) => request<{jobs: {claim_id: string; job_id: string}[]}>('/jobs/assess', {method: 'POST', body: JSON.stringify(ids)}),
+  activeJobs: () => request<{jobs:BatchJob[];worker_available:boolean}>('/jobs/active'),
+  batchStatus: (ids: string[]) => request<BatchProgress>('/jobs/status?' + ids.map(id => 'job_ids=' + encodeURIComponent(id)).join('&')),
+  chat: (message: string, claimId: string | undefined, history: ChatTurn[]) => request<ChatReply>('/chat', {method:'POST', body:JSON.stringify({message, claim_id:claimId, history})}),
+  batch: (ids: string[]) => request<BatchResult>('/jobs/assess', {method: 'POST', body: JSON.stringify(ids)}),
 }

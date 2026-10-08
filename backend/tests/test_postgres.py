@@ -25,8 +25,10 @@ def postgres_engine():
     admin = create_engine(url)
     with admin.begin() as connection:
         connection.execute(text("CREATE SCHEMA " + schema))
-    engine = create_engine(url, connect_args={"options": "-csearch_path=" + schema})
-    Base.metadata.create_all(engine)
+    engine = create_engine(
+        url, connect_args={"options": "-csearch_path=" + schema + ",public"}
+    )
+    Base.metadata.create_all(engine, checkfirst=False)
     with Session(engine) as session:
         seed(session)
     try:
@@ -113,3 +115,21 @@ async def test_arq_batch_job(postgres_engine, settings, monkeypatch):
         await pool.delete("arq:result:" + job.job_id)
     finally:
         await worker.close()
+
+
+async def test_postgres_policy_vectors(postgres_engine, settings):
+    from app.rag.index import index_policy
+    from app.rag.service import PolicyRetrieval
+
+    settings.embedding_provider = "mock"
+    settings.rag_enabled = True
+    with Session(postgres_engine) as session:
+        await index_policy(
+            session,
+            settings,
+            "# Policy\n\n## Receipts\nVerified receipt evidence required.\n\n## Categories\nTravel meals supplies allowed.",
+        )
+        passages = await PolicyRetrieval(session, settings).retrieve(
+            "verified receipt evidence", ["expense-policy"]
+        )
+        assert passages[0]["heading"] == "Receipts"

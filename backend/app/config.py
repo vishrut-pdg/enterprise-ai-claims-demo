@@ -13,8 +13,13 @@ class Settings(BaseSettings):
     app_env: str = "local"
     database_url: str = "postgresql+psycopg://claims:claims@localhost:5432/claims"
     redis_url: str = "redis://localhost:6379/0"
+    arq_queue_name: str = "claims"
     llm_provider: Literal["mock", "ollama", "vertex", "btp"] = "ollama"
     llm_model: str = "gemma4:e4b-it-q4_K_M"
+    rag_enabled: bool = False
+    embedding_provider: Literal["vertex", "mock"] = "vertex"
+    embedding_model: str = "gemini-embedding-001"
+    embedding_location: str = "us-central1"
     llm_timeout: float = 60
     ollama_base_url: str = "http://localhost:11434"
     gcp_project_id: str = ""

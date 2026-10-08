@@ -23,3 +23,6 @@ frontend/playwright-report/
 *.db
 
 .pnpm-store/
+
+# Generated evaluation reports
+backend/evaluation-results/

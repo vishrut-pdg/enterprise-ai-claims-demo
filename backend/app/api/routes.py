@@ -1,9 +1,10 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, Header, Query
 from sqlalchemy.orm import Session
 
 from app.assessment.service import ClaimService, DomainError
+from app.assistant.schemas import ChatRequest
 from app.config import get_settings
 from app.db.repositories.claims import ClaimRepository
 from app.db.session import get_session
@@ -80,12 +81,42 @@ def decision(
 
 
 @router.post("/jobs/assess", dependencies=[Depends(analyst)], status_code=202)
-async def batch(request: list[str]):
+async def batch(request: list[str], svc: Service):
     from app.jobs.worker import enqueue_batch
 
+    if not request or len(request) > 100:
+        raise DomainError("Select 1 to 100 submitted claims", 422)
+    for claim_id in set(request):
+        if svc.claim(claim_id).status != "submitted":
+            raise DomainError("Only submitted claims can be batch assessed", 409)
     return await enqueue_batch(request)
 
 
 @router.get("/health")
 def health():
     return {"status": "ok", "provider": get_settings().llm_provider}
+
+
+@router.get("/jobs/status", dependencies=[Depends(analyst)])
+async def jobs_status(
+    job_ids: Annotated[list[str], Query(min_length=1, max_length=100)],
+):
+    from app.jobs.worker import batch_status
+
+    return await batch_status(job_ids)
+
+
+@router.post("/chat", dependencies=[Depends(analyst)])
+async def chat(request: "ChatRequest", svc: Service):
+    from app.assistant.service import AssistantService
+
+    return await AssistantService(svc, get_settings()).answer(
+        request, correlation_id.get()
+    )
+
+
+@router.get("/jobs/active", dependencies=[Depends(analyst)])
+async def active_batch_jobs():
+    from app.jobs.worker import active_jobs
+
+    return await active_jobs()

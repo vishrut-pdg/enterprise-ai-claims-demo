@@ -2,6 +2,7 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 from uuid import uuid4
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     JSON,
     Boolean,
@@ -177,3 +178,14 @@ class OutcomeRecord(Identity, Timestamp, Base):
     final_decision: Mapped[str] = mapped_column(String(40))
     reviewer_rationale: Mapped[str] = mapped_column(Text)
     evidence_ids: Mapped[list] = mapped_column(JSON)
+
+
+class PolicyChunk(Identity, Base):
+    __tablename__ = "policy_chunks"
+    policy_id: Mapped[str] = mapped_column(ForeignKey("policies.id"), index=True)
+    heading: Mapped[str] = mapped_column(String(200))
+    content: Mapped[str] = mapped_column(Text)
+    source: Mapped[str] = mapped_column(String(200))
+    content_hash: Mapped[str] = mapped_column(String(64))
+    embedding_model: Mapped[str] = mapped_column(String(200))
+    embedding: Mapped[list] = mapped_column(Vector(768).with_variant(JSON(), "sqlite"))

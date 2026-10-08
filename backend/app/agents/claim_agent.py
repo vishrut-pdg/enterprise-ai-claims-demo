@@ -46,6 +46,11 @@ class ClaimAgent(BaseAgent):
                     author=self.name,
                     custom_metadata={"tool": name, "claim_id": claim_id},
                 )
+            if self._gateway.settings.rag_enabled:
+                context["policy_passages"] = await self._tools.retrieve_policy(
+                    context, self._gateway.settings
+                )
+                self._tools.trajectory.append("retrieve_policy_passages")
             self._tools.record_context(claim_id, version, context)
             started = perf_counter()
             assessment, response = await self._gateway.assess(
