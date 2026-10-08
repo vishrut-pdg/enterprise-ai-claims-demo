@@ -237,7 +237,6 @@ class ClaimService:
                 raise DomainError("Claim has already been processed")
             self.assert_context_current(claim_id, context)
             checks = self.calculate_policy_checks(claim_id)
-            policy = self.get_policy(claim_id)
             evidence = self.get_evidence(claim_id)
             current_codes = {f["code"] for f in checks}
             if not set(assessment.findings) <= current_codes or not set(
@@ -267,32 +266,8 @@ class ClaimService:
                 run_id,
                 {"recommendation": assessment.recommendation},
             )
-            clear = assessment.confidence >= 0.9 and not assessment.unresolved_questions
-            if (
-                assessment.recommendation == "accept"
-                and clear
-                and all(f["severity"] == "pass" for f in checks)
-                and policy["auto_accept"]
-                and set(assessment.evidence_ids) == {e["id"] for e in evidence}
-            ):
-                self.accept_claim(claim, policy, checks, assessment, run_id)
-                trajectory.append("accept_claim")
-            elif (
-                assessment.recommendation == "reject"
-                and clear
-                and any(f["severity"] == "reject" for f in checks)
-                and policy["auto_reject"]
-                and any(
-                    f["code"] in assessment.findings
-                    for f in checks
-                    if f["severity"] == "reject"
-                )
-            ):
-                self.reject_claim(claim, policy, checks, assessment, run_id)
-                trajectory.append("reject_claim")
-            else:
-                self.create_review_task(claim, saved, assessment, run_id)
-                trajectory.append("create_review_task")
+            self.create_review_task(claim, saved, assessment, run_id)
+            trajectory.append("create_review_task")
             self.repo.add(
                 m.AIExecution(
                     claim_id=claim_id,
@@ -314,63 +289,6 @@ class ClaimService:
                 ) from exc
             return self.detail(claim_id)
 
-    def accept_claim(self, claim, policy, checks, assessment, run_id):
-        if (
-            not policy["auto_accept"]
-            or assessment.recommendation != "accept"
-            or any(f["severity"] != "pass" for f in checks)
-        ):
-            raise DomainError("Automatic acceptance blocked")
-        previous = claim.status
-        claim.status = "accepted"
-        self.audit(
-            claim.id,
-            "claim_accepted",
-            "system",
-            run_id,
-            {"previous": previous, "result": claim.status},
-        )
-        self.capture_outcome(claim, assessment, "", False)
-
-    def reject_claim(self, claim, policy, checks, assessment, run_id):
-        if (
-            not policy["auto_reject"]
-            or assessment.recommendation != "reject"
-            or not any(f["severity"] == "reject" for f in checks)
-        ):
-            raise DomainError("Automatic rejection blocked")
-        previous = claim.status
-        claim.status = "rejected"
-        self.audit(
-            claim.id,
-            "claim_rejected",
-            "system",
-            run_id,
-            {"previous": previous, "result": claim.status},
-        )
-        self.capture_outcome(claim, assessment, "", False)
-
-    def investigation_reason(self, claim_id, assessment):
-        reasons = [
-            finding["message"]
-            for finding in self.calculate_policy_checks(claim_id)
-            if finding["severity"] != "pass"
-        ]
-        policy = self.get_policy(claim_id)
-        if assessment.confidence < 0.9:
-            reasons.append("Confidence is below the automatic execution threshold.")
-        if assessment.unresolved_questions:
-            reasons.append("Unresolved questions require manager review.")
-        if assessment.recommendation == "accept" and not policy["auto_accept"]:
-            reasons.append("Policy disables automatic acceptance.")
-        if assessment.recommendation == "reject" and not policy["auto_reject"]:
-            reasons.append("Policy disables automatic rejection.")
-        if not reasons:
-            reasons.append(
-                "Recommendation did not satisfy automatic execution controls."
-            )
-        return " ".join(dict.fromkeys(reasons))
-
     def create_review_task(self, claim, saved, assessment, run_id):
         task = self.repo.active_review(claim.id)
         if not task:
@@ -378,7 +296,8 @@ class ClaimService:
                 m.ReviewTask(
                     claim_id=claim.id,
                     assessment_id=saved.id,
-                    reason=self.investigation_reason(claim.id, assessment),
+                    reason="Manager approval is required for every expense claim. "
+                    + assessment.explanation,
                     evidence_ids=assessment.evidence_ids,
                     unresolved_questions=assessment.unresolved_questions,
                 )
@@ -387,7 +306,7 @@ class ClaimService:
         self.repo.flush()
         self.audit(
             claim.id,
-            "investigation_task_created",
+            "manager_review_created",
             "system",
             run_id,
             {"review_id": task.id, "evidence_ids": assessment.evidence_ids},
@@ -448,19 +367,15 @@ class ClaimService:
             )
         )
         previous = claim.status
-        if request.decision == "request_information":
-            task.status = "information_requested"
-            claim.status = "information_requested"
-        else:
-            task.active = False
-            task.status = "closed"
-            claim.status = "accepted" if request.decision == "accept" else "rejected"
-            from app.schemas.assessment import Assessment
+        task.active = False
+        task.status = "closed"
+        claim.status = "accepted" if request.decision == "accept" else "rejected"
+        from app.schemas.assessment import Assessment
 
-            assessment = Assessment.model_validate(
-                self.repo.get(m.ClaimAssessment, task.assessment_id).data
-            )
-            self.capture_outcome(claim, assessment, request.rationale, True)
+        assessment = Assessment.model_validate(
+            self.repo.get(m.ClaimAssessment, task.assessment_id).data
+        )
+        self.capture_outcome(claim, assessment, request.rationale, True)
         self.audit(
             claim.id,
             "manager_decision_recorded",

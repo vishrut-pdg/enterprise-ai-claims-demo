@@ -2,28 +2,28 @@
   {
     "id": "accept",
     "claim_id": "CLM-001",
-    "expected": "accepted",
+    "expected": "pending_manager_review",
     "recommendation": "accept",
     "evidence_ids": [
       "CLM-001-receipt"
     ],
-    "action": "accept_claim"
+    "action": "create_review_task"
   },
   {
     "id": "reject",
     "claim_id": "CLM-002",
-    "expected": "rejected",
+    "expected": "pending_manager_review",
     "recommendation": "reject",
     "evidence_ids": [
       "CLM-002-receipt"
     ],
-    "action": "reject_claim"
+    "action": "create_review_task"
   },
   {
-    "id": "investigate",
+    "id": "missing_receipt_advice",
     "claim_id": "CLM-003",
     "expected": "pending_manager_review",
-    "recommendation": "investigate",
+    "recommendation": "reject",
     "evidence_ids": [],
     "action": "create_review_task"
   },

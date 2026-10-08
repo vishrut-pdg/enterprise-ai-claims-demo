@@ -21,7 +21,7 @@ class ClaimAgent(BaseAgent):
     def __init__(self, tools, gateway):
         super().__init__(
             name="claim_processor",
-            description="Ground, assess, then execute with application controls",
+            description="Ground facts, recommend a decision, then request manager approval",
         )
         self._tools, self._gateway = tools, gateway
 

@@ -78,3 +78,10 @@ Validation completed: 53 backend tests including isolated PostgreSQL/Redis check
 Queue controls now display Run / Running / Finished, with animated execution feedback, active Redis job discovery (including legacy jobs), per-job states/outcomes, refresh persistence and explicit offline readiness. Removed individual assessment controls and placed the chatbot inline on every claim. Collapsed verbose audit event details. Added scripts/demo.sh to start the correct checkout's API, ARQ worker and frontend, update pgvector services, migrate, seed and refresh a changed policy index; trap-based shutdown was smoke-tested with an isolated worker queue.
 
 Validation: 54 backend tests including PostgreSQL/Redis, 11 frontend tests, lint/build and the full browser batch/chat/review scenario. The same seven-claim browser scenario passed with live Vertex AI generation and Vertex policy embeddings/RAG (7 complete, 0 failed), using an isolated test database; a final mock browser run passed as well. The expanded 15-section user policy was preserved and reindexed. Stopped old PDG checkout servers and all verification servers/workers; demo data was not reset by these checks.
+
+
+## Week 2 scope correction — 2026-10-08
+
+The user explicitly narrowed this branch after merging Week 3 into Week 2: AI only recommends accept/reject, never investigates or executes a final decision. Every expense requires manager acceptance/rejection. This instruction supersedes the historical frozen execution scope for this branch. Removed automatic decision service paths and request-information actions; all recommendations create manager review. Added Week 2 labels, policy, dedicated database/queue and setup guide in docs/Week2.md. Week 3 and Week 4 branches remain unchanged.
+
+Verification: 64 backend tests (including PostgreSQL/Redis), 11 frontend tests, 20/20 mock evals, lint/build, and browser flow passed. All seven recommendations wait for approval; manager overrides work both ways. Dedicated Week 2 demo storage and policy index prepared; verification servers stopped. Live Vertex generation was not rerun.

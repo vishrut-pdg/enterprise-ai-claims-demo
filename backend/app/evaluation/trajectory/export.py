@@ -18,7 +18,7 @@ def build_evalset():
         "get_previous_outcomes",
     ]
     return {
-        "eval_set_id": "claims_week4",
+        "eval_set_id": "claims_week2",
         "name": "Claims tool trajectories",
         "eval_cases": [
             {

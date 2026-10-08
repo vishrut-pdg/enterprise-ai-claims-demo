@@ -55,7 +55,7 @@ class Rendezvous(MockProvider):
 
 @pytest.mark.parametrize(
     "claim_id,expected_status",
-    [("CLM-001", "accepted"), ("CLM-003", "pending_manager_review")],
+    [("CLM-001", "pending_manager_review"), ("CLM-003", "pending_manager_review")],
 )
 async def test_concurrent_processing(
     postgres_engine, settings, claim_id, expected_status
@@ -75,7 +75,7 @@ async def test_concurrent_processing(
     assert success["status"] == expected_status
     with Session(postgres_engine) as session:
         service = ClaimService(ClaimRepository(session))
-        assert len(service.list_reviews()) == (1 if claim_id == "CLM-003" else 0)
+        assert len(service.list_reviews()) == 1
         detail = service.detail(claim_id)
         assert len(detail["executions"]) == 2
         assert {e["status"] for e in detail["executions"]} == {"succeeded", "failed"}
@@ -110,7 +110,7 @@ async def test_arq_batch_job(postgres_engine, settings, monkeypatch):
     try:
         await worker.async_run()
         result = await job.result(timeout=5)
-        assert result == {"claim_id": "CLM-001", "status": "accepted"}
+        assert result == {"claim_id": "CLM-001", "status": "pending_manager_review"}
         assert worker.jobs_complete == 1 and worker.jobs_failed == 0
         await pool.delete("arq:result:" + job.job_id)
     finally:

@@ -11,9 +11,9 @@ class Settings(BaseSettings):
         extra="ignore",
     )
     app_env: str = "local"
-    database_url: str = "postgresql+psycopg://claims:claims@localhost:5432/claims"
+    database_url: str = "postgresql+psycopg://claims:claims@localhost:5432/claims_week2"
     redis_url: str = "redis://localhost:6379/0"
-    arq_queue_name: str = "claims"
+    arq_queue_name: str = "claims-week2"
     llm_provider: Literal["mock", "ollama", "vertex", "btp"] = "ollama"
     llm_model: str = "gemma4:e4b-it-q4_K_M"
     rag_enabled: bool = False

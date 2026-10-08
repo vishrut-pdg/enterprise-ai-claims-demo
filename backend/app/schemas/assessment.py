@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 class Assessment(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
-    recommendation: Literal["accept", "reject", "investigate"]
+    recommendation: Literal["accept", "reject"]
     confidence: float = Field(ge=0, le=1, allow_inf_nan=False)
     findings: list[str] = Field(
         description="Exact deterministic check codes from checks[].code; no narrative text",
@@ -23,7 +23,7 @@ class ProcessRequest(BaseModel):
 
 
 class ManagerRequest(ProcessRequest):
-    decision: Literal["accept", "reject", "request_information"]
+    decision: Literal["accept", "reject"]
     rationale: str = Field(min_length=3, max_length=4000)
 
     @field_validator("rationale")

@@ -70,7 +70,7 @@ async def test_assessment_receives_policy_passages(service, settings):
         settings,
         provider=CapturingProvider(),
     )
-    assert result["status"] == "accepted"
+    assert result["status"] == "pending_manager_review"
 
 
 @pytest.mark.asyncio

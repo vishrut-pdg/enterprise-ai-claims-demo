@@ -14,7 +14,7 @@ if [[ ! -x backend/.venv/bin/python || ! -d frontend/node_modules ]]; then
   exit 1
 fi
 docker compose -p enterprise-ai-claims up -d --wait postgres redis
-(cd backend && .venv/bin/python -m alembic upgrade head && .venv/bin/python -m app.seed)
+(cd backend && .venv/bin/python -m app.bootstrap && .venv/bin/python -m alembic upgrade head && .venv/bin/python -m app.seed)
 RAG_ON="$(cd backend && .venv/bin/python -c 'from app.config import get_settings; print(int(get_settings().rag_enabled))')"
 if [[ "$RAG_ON" == "1" ]]; then
   (cd backend && .venv/bin/python -m app.rag.index --if-needed)

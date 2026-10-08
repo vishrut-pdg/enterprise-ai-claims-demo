@@ -21,11 +21,11 @@ def seed(session):
         repo.add(
             m.Policy(
                 id="expense-policy",
-                name="Employee expenses v1",
+                name="Employee expenses — manager approval",
                 text="USD expenses up to $500. Meals, travel and supplies only. A verified receipt is required for every line. Submit within 90 days. Duplicates require review.",
                 currency="USD",
-                auto_accept=True,
-                auto_reject=True,
+                auto_accept=False,
+                auto_reject=False,
             )
         )
         repo.flush()
@@ -40,6 +40,10 @@ def seed(session):
                     id=code, policy_id="expense-policy", code=code, parameters=params
                 )
             )
+    else:
+        policy = repo.get(m.Policy, "expense-policy")
+        policy.auto_accept = False
+        policy.auto_reject = False
     for claim_id, title, amount, category, receipt in [
         ("CLM-001", "Client lunch", "84.50", "meals", True),
         ("CLM-002", "Personal entertainment", "125.00", "entertainment", True),

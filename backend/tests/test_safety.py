@@ -14,7 +14,7 @@ class ChangedSources(MockProvider):
 
     async def generate(self, request):
         policy = self.service.repo.get(m.Policy, "expense-policy")
-        policy.auto_accept = False
+        policy.auto_accept = not policy.auto_accept
         self.service.repo.commit()
         return await super().generate(request)
 

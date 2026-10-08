@@ -34,8 +34,8 @@ class MockProvider:
         recommendation = (
             "reject"
             if any(f["severity"] == "reject" for f in findings)
-            else "investigate"
-            if any(f["severity"] == "investigate" for f in findings)
+            else "reject"
+            if any(f["severity"] == "unverified" for f in findings)
             else "accept"
         )
         data = dict(
@@ -46,7 +46,7 @@ class MockProvider:
             unresolved_questions=[
                 "Please provide the missing or clarified supporting evidence."
             ]
-            if recommendation == "investigate"
+            if any(f["severity"] == "unverified" for f in findings)
             else [],
             explanation="; ".join(f["message"] for f in findings),
         )

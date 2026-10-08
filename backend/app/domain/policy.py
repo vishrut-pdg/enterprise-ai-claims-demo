@@ -52,8 +52,8 @@ def calculate_checks(
     if claim["currency"] != policy["currency"]:
         add(
             "currency",
-            "investigate",
-            "Currency differs from policy; manual conversion review required.",
+            "unverified",
+            "Currency differs from policy; conversion evidence is missing.",
         )
     if amount > Decimal(str(rules["amount_limit"]["maximum"])):
         add("amount_limit", "reject", "Claim exceeds the policy amount limit.")
@@ -89,13 +89,13 @@ def calculate_checks(
         if rules["receipt_required"]["required"] and not receipts:
             add(
                 "receipt_required",
-                "investigate",
+                "unverified",
                 f"Verified receipt missing for {line['description']}.",
             )
     if duplicates:
         add(
             "duplicate",
-            "investigate",
+            "unverified",
             "Receipt fingerprint appears on another claim.",
             duplicates,
         )

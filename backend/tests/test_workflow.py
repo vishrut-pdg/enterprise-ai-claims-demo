@@ -11,8 +11,8 @@ from app.workflows.process_claim import process_claim
 @pytest.mark.parametrize(
     "claim_id,status,action",
     [
-        ("CLM-001", "accepted", "accept_claim"),
-        ("CLM-002", "rejected", "reject_claim"),
+        ("CLM-001", "pending_manager_review", "create_review_task"),
+        ("CLM-002", "pending_manager_review", "create_review_task"),
         ("CLM-003", "pending_manager_review", "create_review_task"),
     ],
 )
@@ -32,7 +32,7 @@ async def test_workflows(service, settings, claim_id, status, action):
     assert result["history"]
     with pytest.raises(DomainError):
         await process_claim(service, claim_id, 1, settings)
-    assert len(service.list_reviews()) == (1 if claim_id == "CLM-003" else 0)
+    assert len(service.list_reviews()) == 1
 
 
 @pytest.mark.asyncio
@@ -43,17 +43,6 @@ async def test_manager_review_memory(service, settings):
         task["id"],
         ManagerRequest(
             expected_version=2,
-            decision="request_information",
-            rationale="Please attach receipt",
-        ),
-        "manager-1",
-        "run-1",
-    )
-    assert result["claim"]["status"] == "information_requested"
-    result = service.manager_decision(
-        task["id"],
-        ManagerRequest(
-            expected_version=3,
             decision="accept",
             rationale="Verified original receipt in person",
         ),
@@ -61,7 +50,7 @@ async def test_manager_review_memory(service, settings):
         "run-2",
     )
     assert result["claim"]["status"] == "accepted"
-    assert len(result["decisions"]) == 2
+    assert len(result["decisions"]) == 1
     assert result["claim"]["outcome"]["reviewed"]
     assert service.repo.find_previous_outcomes("travel", "other")[0].reviewer_rationale
     with pytest.raises(DomainError):
