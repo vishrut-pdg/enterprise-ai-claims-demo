@@ -189,3 +189,20 @@ class PolicyChunk(Identity, Base):
     content_hash: Mapped[str] = mapped_column(String(64))
     embedding_model: Mapped[str] = mapped_column(String(200))
     embedding: Mapped[list] = mapped_column(Vector(768).with_variant(JSON(), "sqlite"))
+
+
+class AIUsageEvent(Identity, Timestamp, Base):
+    """One measured model/embedding request; no prompt or response text is stored."""
+
+    __tablename__ = "ai_usage_events"
+    claim_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    run_id: Mapped[str] = mapped_column(String(64), index=True)
+    operation: Mapped[str] = mapped_column(String(40))
+    provider: Mapped[str] = mapped_column(String(40))
+    model: Mapped[str] = mapped_column(String(160))
+    status: Mapped[str] = mapped_column(String(20))
+    duration_ms: Mapped[int] = mapped_column(Integer)
+    usage: Mapped[dict] = mapped_column(JSON, default=dict)
+    cost_usd: Mapped[Decimal | None] = mapped_column(Numeric(18, 10), nullable=True)
+    cost_basis: Mapped[str] = mapped_column(String(100))
+    error_code: Mapped[str | None] = mapped_column(String(100), nullable=True)
