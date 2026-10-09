@@ -1,150 +1,191 @@
-> **Start the complete demo:** `bash scripts/demo.sh` from this checkout, then open http://127.0.0.1:5173. The launcher starts the frontend, API and required worker together; Ctrl+C stops them. Queue controls show Run / Running / Finished. Every claim has an inline chatbot; assessments run from the queue.
+# Enterprise AI Claims — Week 3
 
-# Enterprise AI Claims — Week 4
+Week 3 combines AI expense assessment with controlled automation and manager review. The AI recommends **accept, reject or investigate**. The application automatically executes eligible, well-supported accept/reject recommendations; uncertainty and missing evidence go to a manager. A read-only chatbot answers clarifying questions, and policy RAG supplies relevant passages from PostgreSQL.
 
-A locally running reference for claim retrieval, deterministic policy checks, structured AI assessment, controlled execution, manager review, outcome memory, evaluation and audit. The product and architecture constraints remain frozen in `docs/PRD.md` and `docs/ARCHITECTURE.md`. Implementation decisions and verification are in `docs/IMPLEMENTATION_PLAN.md`.
+This branch includes seven sample expenses, live batch progress, reviewed-outcome memory, evaluations, audit history and an **AI usage & performance** dashboard. Week 3 retains human oversight for escalated cases. Its workflow differs from Week 1's fact summaries, Week 2's mandatory manager decisions and Week 4's autonomous investigation/decision workflow.
 
-## Prerequisites
+## Start from the correct checkout
 
-Docker Desktop running, uv with Python 3.12, Node (tested with 26.5.0), and pnpm 11.19.0. Use the checked-in uv and pnpm lockfiles. PostgreSQL and Redis run in Docker; application processes run on the host.
+Run every command from the checkout containing the `week-3` branch:
 
-Native Ollama is the default model runtime at localhost:11434. Install/run Ollama and make the configured `LLM_MODEL` available before selecting it. This host has no Ollama installation, so live Ollama inference was not verified. The credential-free mock path below is fully verified and provides deterministic demonstrations.
+```sh
+pwd
+git branch --show-current
+```
 
-## Local setup
+The branch must print `week-3`. If it is already checked out in a separate Git worktree, use that directory; `git worktree list` shows its location. Starting an older checkout's frontend or backend can display stale controls even when another worktree has the updated code.
+
+## Install and prepare
+
+Prerequisites: Docker Desktop running, Python 3.12 with uv, Node.js and pnpm. The project uses checked-in lockfiles; development has been verified with Node 26.5.0 and pnpm 11.19.0. PostgreSQL/Redis run in Docker; the API, worker and frontend run on the host.
 
 From the repository root:
 
-```bash
+```sh
+# New checkout only: keep an existing .env rather than overwriting it.
 cp .env.example .env
-docker compose up -d
+uv sync --directory backend --python 3.12 --extra gcp
+pnpm --dir frontend install --frozen-lockfile
+docker compose -p enterprise-ai-claims up -d --wait postgres redis
+uv run --directory backend alembic upgrade head
+uv run --directory backend python -m app.seed
 ```
 
-Backend terminal:
+Week 3 defaults to database `claims` and queue `claims`. API and worker must use the same `.env`, database, provider/model and `ARQ_QUEUE_NAME`. Root `.env` is loaded regardless of whether the backend starts from the repository root or its own directory; process environment variables take precedence. `.env` is ignored by Git.
 
-```bash
-cd backend
-uv sync --python 3.12
-uv run alembic upgrade head
-uv run python -m app.seed
-LLM_PROVIDER=mock uv run fastapi dev app/main.py --host 127.0.0.1
+Seeding adds missing sample claims without resetting existing assessments, decisions or history. Apply all migrations, including `ai_usage_events`, before processing claims or using chat.
+
+## Run the complete demo
+
+For a credential-free demonstration with deterministic mock generation and RAG disabled:
+
+```sh
+LLM_PROVIDER=mock LLM_MODEL=week3-demo RAG_ENABLED=false bash scripts/demo.sh
 ```
 
-The last command uses the mock provider for an immediately reproducible walkthrough. Once native Ollama is ready, omit the `LLM_PROVIDER=mock` override to use the `.env` provider/model. Configuration is loaded from root `.env`, with environment variables taking precedence. The default model target is `gemma4:e4b-it-q4_K_M`; no code depends on that name.
+For your configured provider and RAG settings:
 
-Separate worker terminal:
-
-```bash
-cd backend
-LLM_PROVIDER=mock uv run arq app.jobs.worker.WorkerSettings
+```sh
+bash scripts/demo.sh
 ```
 
-Use the same provider settings for API and worker. Synchronous assessment needs no worker. **Assess all submitted** checks the worker heartbeat before enqueueing, then displays live progress and each claim outcome. Batch IDs are unique so previous jobs do not block retries. Model failures retry up to three attempts; failed jobs show an actionable error. The queue refreshes automatically as jobs finish. Run the API and worker with the same provider and `ARQ_QUEUE_NAME` (default `claims`). The worker also exposes the `evaluate` job. Redis failure returns an explicit error and does not prevent synchronous actions.
+The launcher starts PostgreSQL/Redis, migrates and seeds the database, refreshes the policy index when RAG is enabled, then starts the API, ARQ worker and frontend. Open [Claims desk](http://127.0.0.1:5173). Ctrl+C stops all three application processes; PostgreSQL and Redis remain running.
 
-Frontend terminal:
+## Run manually without the demo script
 
-```bash
-cd frontend
-pnpm install --frozen-lockfile
-pnpm dev
+After completing the preparation steps, use three terminals from the same repository root.
+
+**Backend:**
+
+```sh
+uv run --directory backend uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-Open [Claims desk](http://localhost:5173). API and interactive endpoint docs are at [localhost:8000/docs](http://localhost:8000/docs). Vite proxies `/api` to the backend. For a separately hosted frontend, set `VITE_API_URL` to the HTTPS backend API prefix and configure `CORS_ORIGINS` as a JSON array.
+**Batch worker:**
 
-| Service | Port |
-| --- | --- |
-| Frontend | 5173 |
-| FastAPI | 8000 |
-| PostgreSQL | 5432 |
-| Redis | 6379 |
-| Native Ollama | 11434 |
+```sh
+uv run --directory backend arq app.jobs.worker.WorkerSettings
+```
 
-The database and Redis ports are bound to loopback. Database credentials in the Compose example are local development values.
+**Frontend:**
 
-## Walkthrough
+```sh
+pnpm --dir frontend dev --host 127.0.0.1 --port 5173 --strictPort
+```
 
-Seeding is idempotent and never overwrites existing claim decisions. A fresh database receives seven submitted claims. Seeding also adds any missing sample IDs to an existing database:
+These commands use `.env`. For mock operation, prefix **both backend and worker commands** with `LLM_PROVIDER=mock LLM_MODEL=week3-demo RAG_ENABLED=false`. The frontend needs no provider override.
 
-| Claim | Scenario | Mock outcome |
+Check readiness with:
+
+```sh
+curl http://127.0.0.1:8000/api/health
+curl http://127.0.0.1:8000/api/jobs/active
+```
+
+Wait for `worker_available: true` before starting a batch. A running API alone does not start the worker. **HTTP 202 means queued, not completed**; the frontend polls job status and refreshes claim/review data as jobs finish. A missing worker or unavailable Redis produces an explicit error.
+
+Frontend: [127.0.0.1:5173](http://127.0.0.1:5173). API docs: [127.0.0.1:8000/docs](http://127.0.0.1:8000/docs). Vite proxies `/api` to port 8000. Ports 5432 (PostgreSQL) and 6379 (Redis) are bound to loopback. For a separately hosted frontend, configure `VITE_API_URL` and `CORS_ORIGINS`.
+
+Press Ctrl+C in each application terminal to stop its process. To stop the database services without deleting their volume:
+
+```sh
+docker compose -p enterprise-ai-claims stop postgres redis
+```
+
+## Demo walkthrough
+
+1. Open **Claim queue** and press **Run**. The control transitions **Run → Running → Finished**, with running/queued counts, completion progress, individual job results and failures. Batch IDs are unique; retryable provider failures can make up to three attempts.
+2. Open a claim to inspect source facts, applicable policy, evidence, deterministic findings, AI interpretation, outcome and audit history. There is no per-claim **Assess & process** button; start assessments from the queue.
+3. Use the inline **Ask about this claim** chatbot for clarifying questions. For CLM-003, ask **What evidence is missing?** Answers cite validated source IDs. Queue and review screens also have a floating assistant.
+4. Open CLM-003's manager review, enter a rationale, and choose **Accept**, **Reject** or **Request information**. Accept/Reject confirms completion and closes the review; an information request leaves it active. Closed reviews remain available through **Include closed reviews**.
+5. Open **AI usage & performance** below Manager review to inspect run outcomes, latency, token usage and estimated costs. The page refreshes every five seconds and supports date/provider filters and searchable histories.
+
+Expected outcomes with a fresh database, the mock provider and the seeded policy:
+
+| Claim | Scenario | Expected outcome |
 | --- | --- | --- |
 | CLM-001 | Supported client lunch | Accepted |
-| CLM-002 | Non-reimbursable personal entertainment | Rejected |
-| CLM-003 | Taxi with missing verified receipt | Pending manager review |
+| CLM-002 | Personal entertainment | Rejected |
+| CLM-003 | Airport taxi, receipt missing | Pending manager review |
 | CLM-004 | Office stationery with receipt | Accepted |
 | CLM-005 | Conference rail ticket with receipt | Accepted |
-| CLM-006 | Hotel stay above $500 limit | Rejected |
-| CLM-007 | Team lunch with missing receipt | Pending manager review |
+| CLM-006 | Hotel stay above allowance | Rejected |
+| CLM-007 | Team lunch, receipt missing | Pending manager review |
 
-Open each claim and choose **Assess & process**. The screen separates source facts, policy, deterministic findings and AI interpretation. Clear cases execute automatically only when policy permits them. Open CLM-003's manager review, enter a rationale, and Accept, Reject or Request information. Information requests remain active and can be followed by a final decision. Closed reviews remain available through the queue's **Include closed reviews** filter. The claim displays its final outcome and audit history.
+Cloud-model outcomes can vary; service controls still determine whether an automatic action is allowed. Existing decisions are preserved when the app restarts.
 
-Reviewed final decisions become retrieval memory for future claims in the same expense category. Automatic outcomes are recorded but excluded from reviewed-memory retrieval. Memory does not fine-tune a model or override current policy. Receipt evidence is seeded text with verified metadata; this reference does not implement receipt upload, OCR or employee submission.
+## Agent, policy checks and memory
 
-## Execution controls and boundaries
+Thin FastAPI routes call `ClaimService`; repositories encapsulate SQLAlchemy. The bounded ADK agent retrieves the claim, policy and evidence, calculates policy checks, retrieves previous reviewed outcomes and applicable policy passages, then requests a structured assessment through the provider-neutral gateway. It receives tools, never a database session.
 
-Thin FastAPI routes delegate to `ClaimService`; repositories encapsulate SQLAlchemy. The ADK `ClaimAgent` runs a small bounded trajectory: get claim → policy → evidence → calculate checks → retrieve reviewed outcomes → gateway assessment → controlled application action. It receives tools, never a session. ADK sessions/events orchestrate the run; model inference uses the internal gateway for every provider.
+Deterministic checks use decimal arithmetic and validate amounts, line totals, currencies, limits, categories, receipt coverage, dates and duplicate fingerprints. Automatic execution requires confidence of at least 0.9, no unresolved questions, policy permission, current claim version and unchanged source context. Automatic acceptance requires passing checks; automatic rejection must reference a real rejection finding. Other recommendations are escalated to manager review.
 
-Amounts use decimal arithmetic. Rules check positive amounts, line totals, currency, limits, categories, receipt coverage, dates and receipt fingerprints. Currency mismatch/duplicates/missing receipts require investigation. Forbidden category, invalid amount/date and excess limits provide explicit rejection conditions. An automatic action requires confidence at least 0.9, no unresolved questions, current claim version, unchanged source context, current deterministic checks and policy permission. Automatic rejection must reference an actual rejection finding. Unsupported recommendations create human review, never an unchecked decision.
+PostgreSQL row locks, optimistic versions and a unique active-review index protect competing actions. Final decisions, outcomes and audit are committed together. Invalid output, invented references, timeouts and provider failures leave business status unchanged and record error codes. The local UI demonstrates manager roles using `X-Role`/`X-Actor`; these headers are not production authentication.
 
-PostgreSQL row locks and SQLAlchemy optimistic versions prevent competing actions. A partial unique index enforces one active review per claim. Transactions persist decisions, outcomes and audit together. Invalid JSON, invalid references, timeouts and provider failures leave business status unchanged and record safe error codes. Version conflicts return 409; invalid requests 422; provider failures 502; queue/database outages 503.
+Reviewed final outcomes become retrieval memory for later claims in the same category. Automatic outcomes are recorded but excluded from reviewed-memory retrieval. Memory does not fine-tune the model or override current policy.
 
-The UI deliberately runs as a **trusted local manager**. `X-Role` and `X-Actor` demonstrate role boundaries, not authentication. A production identity provider and authorization model are required before exposing this reference publicly. Claim lines/evidence/policies have no public editing endpoint; internal source snapshot checks also detect changes outside the claim version.
+## Providers and policy RAG
 
-## Provider configuration
+Providers include mock, native Ollama, Vertex AI and an SAP BTP adapter for Azure OpenAI chat-completions deployments. SDK/authentication code stays inside provider adapters. Ollama is the `.env.example` default and requires a running local model at port 11434. Mock needs no credentials. Other SAP Hub wire formats require an adapter extension.
 
-| Provider | Required configuration | Verification |
-| --- | --- | --- |
-| mock | `LLM_PROVIDER=mock`, any model label | Full workflow, evaluation and E2E |
-| Ollama | `LLM_PROVIDER=ollama`, `LLM_MODEL`, `OLLAMA_BASE_URL` | HTTP request/response contract tested; live model unavailable |
-| Vertex AI | `LLM_PROVIDER=vertex`, model, `GCP_PROJECT_ID`, `GCP_LOCATION`, application default credentials | SDK adapter contract tested without credentials; live inference unverified |
-| SAP BTP AI | `LLM_PROVIDER=btp`, model, `BTP_AI_BASE_URL`, `BTP_AI_DEPLOYMENT_ID`, OAuth settings, resource group | OAuth and inference wire contracts tested; live inference unverified |
+For local Vertex setup, project/model/region settings, ADC and indexing commands, follow [Week 3 setup](docs/Week3.md#7-local-vertex-setup-and-fixes). API and worker use the same generation configuration; embeddings can use a separate supported region.
 
-The SAP adapter targets an Azure OpenAI chat-completions deployment in SAP AI Core/Generative AI Hub. Other Hub model wire formats or orchestration deployments require an adapter extension. `BTP_AI_BASE_URL` is the AI API base URL (before `/v2`); `BTP_TOKEN_URL` is the full OAuth token endpoint. Provider SDKs/authentication stay inside adapters. Cloud `health()` methods report configuration readiness, not a credential/inference probe. `.env` is ignored; never commit credentials.
+The readable policy source is [docs/policies/README.md](docs/policies/README.md). RAG splits it into passages, generates 768-dimensional embeddings, and stores text, source IDs, content hashes and vectors in PostgreSQL/pgvector. Query-time cosine search is scoped to the current policy and embedding-model identity. Retrieved passages support explanations and chat citations; they cannot override deterministic checks or grant decision authority.
 
-## Tests and evaluation
+Index before enabling `RAG_ENABLED=true`:
 
-Backend:
-
-```bash
-cd backend
-uv run pytest -q
-uv run ruff check app tests
-uv run python -m app.evaluation.run
-uv run python -m app.evaluation.trajectory.export
+```sh
+uv run --directory backend python -m app.rag.index --if-needed
 ```
 
-The normal suite uses mock providers and isolated SQLite and needs no cloud credentials. PostgreSQL/Redis tests are opt-in; they create temporary schemas/queues and preserve demo data:
+`EMBEDDING_PROVIDER=vertex` uses ADC and Vertex API calls. `--if-needed` avoids reindexing unchanged policy/model combinations. Missing or mismatched indexes fail explicitly. For an offline RAG demonstration, use mock generation and `EMBEDDING_PROVIDER=mock` consistently when indexing and running the app. Keep the existing PostgreSQL volume when upgrading the pgvector image.
 
-```bash
+## AI usage and performance
+
+Open [the analytics page](http://127.0.0.1:5173/#/analytics). It separates full claim runs from generation/chat/embedding requests and shows failures, average/P95 latency, provider/model groups, tokens, estimated USD cost and expandable run traces.
+
+A rejected expense can still be a successful AI run. Costs are provider API estimates, not a cloud bill; unknown rates or usage remain unavailable. Historical claim usage is recovered where possible, while measured chat/embedding history begins with the analytics migration. Configure `AI_COST_RATES` for different model prices. See [AI_ANALYTICS.md](docs/AI_ANALYTICS.md) for rate units, data coverage and code locations.
+
+## Tests and evaluations
+
+From the repository root:
+
+```sh
+uv run --directory backend pytest -q
+uv run --directory backend ruff check app tests
+uv run --directory backend python -m app.evaluation.suite
+pnpm --dir frontend test
+pnpm --dir frontend lint
+pnpm --dir frontend build
+```
+
+The offline evaluation suite runs 20 cases covering RAG, all seven outcomes, chat grounding, manager review, guardrails and baseline regressions. It uses isolated SQLite/mock providers, preserves demo data, saves `backend/evaluation-results/latest.json`, and exits nonzero when checks fail. See [EVALS.md](docs/EVALS.md) for live Vertex evaluation and grading limits.
+
+For optional isolated PostgreSQL/Redis tests, keep the services running:
+
+```sh
 TEST_POSTGRES_URL=postgresql+psycopg://claims:claims@localhost:5432/claims \
-TEST_REDIS_URL=redis://localhost:6379/0 uv run pytest -q
+TEST_REDIS_URL=redis://localhost:6379/0 \
+uv run --directory backend pytest -q
 ```
 
-Frontend:
+Browser tests require local Redis and Chromium:
 
-```bash
-cd frontend
-pnpm test
-pnpm lint
-pnpm build
-pnpm exec playwright install chromium
-pnpm test:e2e
+```sh
+pnpm --dir frontend exec playwright install chromium
+pnpm --dir frontend test:e2e
 ```
 
-Playwright launches a fresh temporary SQLite/mock backend on 8001, a dedicated ARQ queue/worker and frontend on 5174. Local Redis must be running. It does not alter demo data and shuts down its API, frontend and worker automatically. The E2E path covers automatic acceptance/rejection, investigation, manager completion feedback, outcomes, audit, a four-claim real-worker batch and a cited chatbot answer. Screenshot and failed traces are written under ignored `test-results/`.
+Playwright starts a temporary SQLite/mock backend on 8001, a dedicated queue/worker and frontend on 5174. It checks seven-claim batch completion, automatic acceptance/rejection and review escalation, Run/Running/Finished, refresh persistence, claim chat, manager completion and the analytics page. It shuts down its test servers and preserves demo data. Screenshots/failure traces are under ignored `frontend/test-results/`.
 
-The version-controlled evaluation dataset covers policy/evidence retrieval, claim version, tool trajectory, grounding, unsafe-action escalation, human-review boundaries, invalid output and stale versions. The trajectory exporter produces a schema-validated Google ADK EvalSet. Behavioral safety assertions run separately because trajectory similarity alone cannot verify transaction controls. ADK native model-based scoring has not been run.
+The original regression runner and ADK EvalSet exporter remain available as `python -m app.evaluation.run` and `python -m app.evaluation.trajectory.export` from `backend`. Trajectory similarity alone does not verify transaction controls or model quality.
 
-## Telemetry and portability
+## Further reading
 
-Every HTTP response supplies `X-Correlation-ID`; a valid UUID supplied in the request is propagated. Audit and AI execution records include the run ID, tool trajectory, provider/model, status, timing and safe error code. OpenTelemetry spans cover HTTP, workflow, agent, model, tools, controlled services and SQL execution. Set `OTEL_EXPORTER_OTLP_ENDPOINT` to an OTLP HTTP collector to export traces. SQL statements/parameters and credentials are not logged. Exporter delivery is not verified here.
+- [Week 3 implementation and demo notes](docs/Week3.md)
+- [Codebase guide: agent, memory, RAG and services](docs/CODEBASE_GUIDE.md)
+- [Evaluation coverage and commands](docs/EVALS.md)
+- [AI analytics setup and implementation](docs/AI_ANALYTICS.md)
+- [Original product requirements](docs/PRD.md) and [architecture](docs/ARCHITECTURE.md)
 
-`deployment.yaml` records the deployment contract. `deploy/local/`, `deploy/btp/` and `deploy/gcp/` contain minimal platform descriptors, with a root Dockerfile for the API. The BTP buildpack's locked dependencies are exported to `backend/requirements.txt`; the runtime template is under `deploy/btp/`. Cloud deployment still needs real PostgreSQL/Redis bindings, secure secrets, identity/IAM, networking, frontend hosting and a persistent worker. Cloud descriptors and Docker image build are unverified; the application itself remains platform-neutral.
-
-## Assistant and action feedback
-
-**Ask assistant** opens a compact read-only chatbot. On a claim or manager-review detail it uses that claim's current facts, policy, checks and evidence; on a queue it uses queue summaries and policies. Answers cite validated source IDs. The assistant uses the configured provider (including Vertex); mock tests need no credentials. It cannot accept, reject, enqueue or mutate claims. Conversation stays in the current page session and is cleared when you navigate to another context.
-
-Assessment buttons show progress and confirm the recorded outcome. An investigation opening is clearly distinguished from its eventual manager completion. Accept/Reject confirms **Investigation complete** and the final status; Request information confirms that the review remains open.
-
-Policy RAG setup and a step-by-step explanation of the application are in [the codebase guide](docs/CODEBASE_GUIDE.md). The indexed policy source is [the expense policy README](docs/policies/README.md). PostgreSQL now uses a pgvector-enabled PostgreSQL 16 image. Keep the existing volume when upgrading, migrate, index, then enable `RAG_ENABLED`.
-
-Run the Week 3 eval suite with `uv run --directory backend python -m app.evaluation.suite`. See [eval coverage, reports and live Vertex commands](docs/EVALS.md).
+Audit/execution records and `X-Correlation-ID` link requests to tool trajectories, provider/model, timing and outcomes. OpenTelemetry spans cover HTTP, workflow, agent, tools, model and SQL execution; configure `OTEL_EXPORTER_OTLP_ENDPOINT` for an OTLP HTTP collector. Deployment descriptors live in `deployment.yaml` and `deploy/`; cloud hosting still requires service bindings, secrets, identity, networking and a persistent worker.
