@@ -120,3 +120,14 @@ async def active_batch_jobs():
     from app.jobs.worker import active_jobs
 
     return await active_jobs()
+
+
+@router.get("/analytics/ai", dependencies=[Depends(analyst)])
+def ai_analytics(
+    svc: Service,
+    days: int = Query(default=30, ge=0, le=3650),
+    provider: str | None = Query(default=None, max_length=40),
+):
+    from app.analytics.service import dashboard
+
+    return dashboard(svc.repo.session, get_settings(), days, provider)

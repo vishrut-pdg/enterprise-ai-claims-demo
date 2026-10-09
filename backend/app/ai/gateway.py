@@ -2,13 +2,15 @@ import asyncio
 from copy import deepcopy
 
 from app.ai.models import LLMRequest, ProviderError
+from app.analytics.metering import measured
 from app.schemas.assessment import Assessment
 from app.telemetry import span
 
 
 class LLMGateway:
-    def __init__(self, provider, settings):
+    def __init__(self, provider, settings, usage_session=None):
         self.provider, self.settings = provider, settings
+        self.usage_session = usage_session
 
     async def assess(self, context, run_id):
         allowed_evidence = {e["id"] for e in context["evidence"]}
@@ -29,19 +31,31 @@ class LLMGateway:
             response_schema=schema,
             correlation_id=run_id,
         )
-        with span("model.generate", run_id):
+        with (
+            measured(
+                self.usage_session,
+                self.settings,
+                "summary",
+                self.settings.llm_provider,
+                request.model,
+                run_id,
+                context.get("claim", {}).get("id"),
+            ) as measurement,
+            span("model.generate", run_id),
+        ):
             try:
                 response = await asyncio.wait_for(
                     self.provider.generate(request), self.settings.llm_timeout
                 )
             except TimeoutError as exc:
                 raise ProviderError("Model timeout") from exc
+            measurement.usage = response.usage
             assessment = Assessment.model_validate_json(response.content)
-        if (
-            not set(assessment.evidence_ids) <= allowed_evidence
-            or not set(assessment.findings) <= allowed_findings
-        ):
-            raise ValueError("Assessment contains unknown references")
-        if not assessment.findings:
-            raise ValueError("Assessment must reference deterministic findings")
+            if (
+                not set(assessment.evidence_ids) <= allowed_evidence
+                or not set(assessment.findings) <= allowed_findings
+            ):
+                raise ValueError("Assessment contains unknown references")
+            if not assessment.findings:
+                raise ValueError("Assessment must reference deterministic findings")
         return assessment, response
