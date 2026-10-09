@@ -4,9 +4,9 @@ from app.rag.repository import PolicyRepository
 
 
 class PolicyRetrieval:
-    def __init__(self, session, settings):
+    def __init__(self, session, settings, claim_id=None):
         self.session, self.settings = session, settings
-        self.embeddings = Embeddings(settings)
+        self.embeddings = Embeddings(settings, usage_session=session, claim_id=claim_id)
 
     async def retrieve(self, question, policy_ids):
         if not self.settings.rag_enabled:

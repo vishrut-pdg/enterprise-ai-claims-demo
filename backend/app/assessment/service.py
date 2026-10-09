@@ -138,9 +138,9 @@ class ClaimService:
                 "checks": context["checks"],
             }
         )
-        return await PolicyRetrieval(self.repo.session, settings).retrieve(
-            query, [context["policy"]["id"]]
-        )
+        return await PolicyRetrieval(
+            self.repo.session, settings, claim_id=context["claim"]["id"]
+        ).retrieve(query, [context["policy"]["id"]])
 
     def prepare(self, claim_id, expected, run_id):
         claim = self.claim(claim_id)

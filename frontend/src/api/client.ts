@@ -1,3 +1,4 @@
+import type { AIAnalytics } from '../types/analytics'
 import type { Claim, ClaimDetail, Review, ReviewDetail, Outcome, BatchResult, BatchJob, BatchProgress, ChatTurn, ChatReply } from '../types/claims'
 const base = import.meta.env.VITE_API_URL ?? '/api'
 export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -7,6 +8,7 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
   return data as T
 }
 export const api = {
+  analytics: (days:number, provider:string) => request<AIAnalytics>(`/analytics/ai?days=${days}${provider ? '&provider='+encodeURIComponent(provider) : ''}`),
   claims: () => request<Claim[]>('/claims'),
   claim: (id: string) => request<ClaimDetail>(`/claims/${encodeURIComponent(id)}`),
   process: (id: string, version: number) => request<ClaimDetail>(`/claims/${encodeURIComponent(id)}/process`, {method: 'POST', body: JSON.stringify({expected_version: version})}),
