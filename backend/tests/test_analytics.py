@@ -40,6 +40,16 @@ def test_missing_usage_and_embedding_units(settings):
     assert estimate(
         "vertex", "gemini-embedding-001", {"billable_character_count": 1000}, settings
     )[0] == Decimal("0.00015")
+    assert (
+        tokens(
+            {
+                "prompt_token_count": 10,
+                "candidates_token_count": 20,
+                "prompt_tokens_details": [{"modality": "TEXT", "token_count": 10}],
+            }
+        )["total_tokens"]
+        == 30
+    )
     assert tokens({"input_tokens": True, "output_tokens": -1})["total_tokens"] is None
     assert estimate("mock", "offline", {}, settings)[0] == 0
 
@@ -131,6 +141,7 @@ def test_historical_week4_stages_and_latency(service, settings):
 
 def test_analytics_api_filters_and_access(service, settings, monkeypatch):
     from fastapi.testclient import TestClient
+
     from app.api import routes
     from app.main import app
 

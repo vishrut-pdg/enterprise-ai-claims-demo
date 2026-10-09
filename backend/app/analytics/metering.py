@@ -19,6 +19,8 @@ DEFAULT_RATES = {
 
 
 def count(data, *keys):
+    if not isinstance(data, dict):
+        return None
     for key in keys:
         value = data.get(key)
         if (
