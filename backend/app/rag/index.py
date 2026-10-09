@@ -27,7 +27,7 @@ async def index_policy(session, settings, text):
     if not session.get(Policy, POLICY_ID):
         raise ValueError("Seed the expense policy first")
     session.commit()
-    adapter = Embeddings(settings)
+    adapter = Embeddings(settings, usage_session=session)
     prepared = []
     for position, (heading, content) in enumerate(chunks(text)):
         prepared.append(
@@ -70,7 +70,9 @@ async def main():
                 expected
                 and [c.content_hash for c in existing] == expected
                 and all(
-                    c.embedding_model == Embeddings(settings).identity for c in existing
+                    c.embedding_model
+                    == Embeddings(settings, usage_session=session).identity
+                    for c in existing
                 )
             ):
                 print("Policy index is up to date")

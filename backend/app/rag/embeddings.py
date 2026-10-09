@@ -5,13 +5,28 @@ import hashlib
 import math
 import re
 
+from app.analytics.metering import measured
+
 
 class Embeddings:
-    def __init__(self, settings):
+    def __init__(self, settings, usage_session=None, claim_id=None):
         self.settings = settings
+        self.usage_session = usage_session
+        self.claim_id = claim_id
         self.identity = f"{settings.embedding_provider}:{settings.embedding_model}:768"
 
     async def embed(self, text, document=False):
+        with measured(
+            self.usage_session,
+            self.settings,
+            "embedding_document" if document else "embedding_query",
+            self.settings.embedding_provider,
+            self.settings.embedding_model,
+            claim_id=self.claim_id,
+        ) as measurement:
+            return await self._embed(text, document, measurement)
+
+    async def _embed(self, text, document, measurement):
         if self.settings.embedding_provider == "mock":
             vector = [0.0] * 768
             for token in re.findall(r"[a-z0-9]+", text.lower()):
@@ -40,6 +55,15 @@ class Embeddings:
                     self.settings.llm_timeout,
                 )
                 vector = response.embeddings[0].values
+                measurement.usage = {
+                    "billable_character_count": getattr(
+                        response.metadata, "billable_character_count", None
+                    ),
+                    "input_tokens": getattr(
+                        response.embeddings[0].statistics, "token_count", None
+                    ),
+                    "output_tokens": 0,
+                }
         if len(vector) != 768 or not all(math.isfinite(v) for v in vector):
             raise ValueError("Invalid embedding")
         norm = math.sqrt(sum(v * v for v in vector))

@@ -27,7 +27,11 @@ async def _process_claim(
 ):
     service.prepare(claim_id, expected_version, run_id)
     tools = ClaimTools(service, run_id)
-    gateway = LLMGateway(provider or create_provider(settings), settings)
+    gateway = LLMGateway(
+        provider or create_provider(settings),
+        settings,
+        usage_session=service.repo.session,
+    )
     agent = ClaimAgent(tools, gateway)
     sessions = InMemorySessionService()
     session = await sessions.create_session(
